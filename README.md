@@ -53,51 +53,67 @@ O `drizzle.config.ts` lê `DATABASE_URL` do `.env.local` automaticamente.
 | `GET /api/searches` · `GET /api/searches/[id]` · `DELETE …` | Histórico (listar, abrir, apagar, esvaziar lixeira). |
 | `GET /api/status` · `GET /api/health` | Diagnóstico: chave configurada, modelo, tipo de armazenamento. |
 
-## Versão estática (GitHub Pages) — publicar
+## Versão estática (GitHub Pages) — publicar e atualizar
 
-O Pages ainda **não está habilitado** neste repositório (e habilitar exige permissão de dono do
-repo — o agente não pode). É um clique:
+O arquivo publicado é `index.html` da raiz (com a cópia idêntica `public/gh-pages-demo.html`, que o
+workflow usa como fonte). **Qualquer mudança nesses dois arquivos precisa ser feita nas duas cópias.**
 
-**Settings → Pages → Build and deployment → Source: `GitHub Actions`**
+**De onde o Pages lê** — *Settings → Pages → Build and deployment → Source*:
 
-A partir daí, o workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) publica
-automaticamente a cada push na `main` (e pode ser disparado à mão em *Actions → Pages (versão
-estática) → Run workflow*). Ele sobe **somente** a demo estática — `index.html` (+ a cópia
-`gh-pages-demo.html` e a pasta `pages-proxy/`) — em vez de espelhar a árvore inteira do
-repositório como site.
+| Source | O que acontece |
+| --- | --- |
+| `Deploy from a branch` → `arena/01a0cc30-assistentedelicitacoes` / `(root)` | cada push no branch atualiza o site em ~30 s, sem PR e sem merge. É o que permite continuar mexendo direto no diretório. |
+| `GitHub Actions` (workflow) | usa [`.github/workflows/pages.yml`](.github/workflows/pages.yml), que publica só a demo e pode injetar a chave a partir do secret `GEMINI_API_KEY`. **Só funciona com o workflow registrado na branch padrão** — enquanto as mudanças estiverem num branch não publicado, o Pages fica congelado na última build, por mais push que você dê. |
+
+Se o Source está em `GitHub Actions` e o workflow ainda não está na branch padrão, o site **não
+atualiza** (nenhuma build é criada ao fazer push) — é o sintoma de “mudei e continua igual”. Volte
+para `Deploy from a branch` ou leve o workflow para a `main`.
 
 Depois de publicado, em `https://marcossilva023l20.github.io/assistentedelicitacoes/`:
 
-- **A chave já vai embutida na página** (`PRESET_GEMINI_KEY`, em `index.html`): quem abre o site
-  não precisa colar nada. Consequência inevitável de hospedar em Pages — **o repositório é público,
-  então a chave é legível por qualquer visitante**, que pode gastar a sua cota grátis (e, se a chave
-  tiver cobrança ligada, o seu cartão). Mitigações, da mais barata à mais robusta:
-  1. Deixe a cota **sem billing** (só AI Studio, sem cartão) — o dano máximo é a cota do dia.
-  2. Restrinja a chave no Google Cloud Console → *APIs & Services → Credentials → API keys* →
-     *Application restrictions → HTTP referrers*, liberando `https://*.github.io` e
-     `http://localhost:*`. Bloqueia uso casual por terceiros (não é uma barreira absoluta:
-     `Referer` é fácil de forjar para quem não é navegador).
-  3. **Tire a chave do HTML e use o secret do Actions**: crie
-     `Settings → Secrets and variables → Actions → New repository secret` chamado `GEMINI_API_KEY`
-     e apague o valor da constante no `index.html` (deixe `const PRESET_GEMINI_KEY = "";`).
-     O workflow injeta o secret no artefato publicado (`.github/scripts/inject-key.mjs`) e o site
-     continua funcionando — mas aí a versão aberta direto do disco (`file://`) pede a chave no modal.
-  4. Rode a versão Next.js num servidor: a chave fica em `.env.local`/variável de ambiente e nunca
-     aparece no bundle do navegador (é a única opção em que o visitante não consegue ler a chave).
-- O visitante ainda pode colar a **própria** chave em **⚙ Chave IA** (fica no `localStorage` do
-  dispositivo e tem prioridade sobre a embutida); deixar o campo vazio volta para a chave do site.
-- O indicador do topo diz em que estado você está: `configure a chave da IA` →
-  `IA ativa · proxies públicos (instáveis)` → `IA ativa · varredura pelo seu proxy`.
-- **Recomendado:** implante o proxy gratuito de [`pages-proxy/worker.js`](pages-proxy/worker.js)
-  num Cloudflare Worker (2 min, camada grátis) e cole a URL no mesmo modal — sem isso, a leitura
-  dos preços nas páginas das lojas depende dos proxies CORS públicos, que hoje estão com limite de
-  plano, fora do ar ou pedindo chave paga. O app avisa claramente quando o transporte falhou, em
-  vez de dizer que “não achou ofertas”.
-- Alternativa sem workflow: Source = `Deploy from a branch` → `main` / `(root)`. Nesse caso o site
-  serve a árvore toda (qualquer pessoa consegue baixar `src/`), e o `.nojekyll` na raiz já cuida
-  de desligar o pipeline Jekyll.
+- **A chave não vai no código público.** O valor de `PRESET_GEMINI_KEY` é `""`: o Push Protection do
+  GitHub rejeita commit com chave de API literal (`GH013`), e o agente não burla esse bloqueio.
+- Cada dispositivo que colar a chave uma vez em **⚙ Chave IA** para de perguntar (fica no
+  `localStorage`). Para “salvar sem digitar nada” em um navegador seu, favorite um link com o
+  fragmento — o que vem depois de `#` não é enviado a servidor nenhum e não entra no repositório:
 
-## Fluxo da análise
+  ```
+  https://<usuario>.github.io/assistentedelicitacoes/#chave=AIza…
+  ```
+
+  O mesmo vale para o servidor: `#servidor=https://licita-proxy.<conta>.workers.dev/`.
+- Para **todos** os visitantes pararem de ver o pedido, há dois caminhos: (a) secret `GEMINI_API_KEY`
+  em *Settings → Secrets and variables → Actions* + workflow na branch padrão (exige merge); (b) o
+  Worker de [`pages-proxy/`](pages-proxy/worker.js), que guarda a chave fora do HTML e faz a chamada
+  da IA por você — funciona sem merge e desliga o pedido de chave. Detalhes em
+  [`pages-proxy/LEIA-ME.md`](pages-proxy/LEIA-ME.md).
+- O indicador do topo diz o estado real: `configure a chave da IA` → `IA ativa · sua chave local` /
+  `IA ativa · chave do site` → `IA via servidor · varredura própria`.
+- Sem o Worker, a leitura dos preços nas lojas depende de proxies CORS públicos (`cors.eu.org`,
+  `allorigins.win`, `corsproxy.io`…), hoje com limite de plano, fora do ar ou pedindo chave paga.
+  O app avisa **“nenhum proxy respondeu”** em vez de dizer que não achou ofertas.
+
+## Tela de acesso (e-mail e senha)
+
+A página abre com uma tela de acesso. Dois modos, o próprio site decide:
+
+- **Local (padrão, zero infraestrutura).** No primeiro uso a tela já vem em modo *criar acesso*: você
+  define e-mail + senha (mín. 10 caracteres) e entra. Os acessos ficam no `localStorage` do
+  navegador, como `SHA-256(salt + ":" + senha)` — a senha em si nunca é gravada. Enquanto `html.locked`
+  estiver no documento, o resto da página fica invisível e nada roda: `runAnalysis()` recusa sem
+  sessão, e o botão `sair` derruba a sessão.
+- **Servidor (recomendado).** Preencha ⚙ → **Servidor** com a URL do Worker (`https://…workers.dev/`):
+  o login passa a ser validado por `POST /login` com token HMAC assinado por `AUTH_SECRET`, a sessão é
+  revalidada em `GET /verify` a cada abertura e os visitantes param de receber pedido de chave porque a
+  IA é chamada pelo Worker (`POST /gemini`). Configuração completa em [`pages-proxy/LEIA-ME.md`](pages-proxy/LEIA-ME.md).
+
+**Honestidade sobre o que isso protege:** numa página estática, a tela de acesso é **barreira de
+entrada, não segurança** — o HTML e o JavaScript continuam visíveis em *Ver código-fonte*, e um
+portão do lado do navegador pode ser contornado por quem sabe inspecionar. Ela serve para uso
+compartilhado no mesmo computador, para não deixar consulta solta em tela e para obrigar sessão
+válida no Worker. Em modo **servidor**, a barreira é real (o token é verificado fora do navegador) e
+ela vale também para a cota da IA. Um portão client-side **não** esconde uma chave embutida: se a
+chave estiver no HTML, continua pública mesmo com a tela de login.
 
 ## Fluxo da análise
 
@@ -116,3 +132,7 @@ Como não há servidor intermediário, a varredura das lojas depende de proxies 
 | `Nenhum modelo de IA disponível para esta chave` | `GEMINI_MODEL` aponta para um modelo inexistente — deixe vazio para usar os padrões. |
 | `Não consegui confirmar nenhuma oferta agora` | As lojas limitaram o acesso momentaneamente; tente de novo em alguns segundos. |
 | PDF digitalizado não segmenta | O arquivo é imagem; rode OCR antes (a versão estática também precisa de texto extraível). |
+| A tela de acesso não sai do lugar / nada aparece | Sessão expirada ou `AUTH_SECRET` ausente no Worker: o `/verify` devolve 401 e o site volta a bloquear. Crie o secret (ou limpe ⚙ → **Servidor** para usar o modo local) e recarregue. |
+| “Muitas tentativas. Aguarde 30 s.” | Cooldown anti-força-bruta: 5 falhas seguidas no mesmo navegador. Espere os 30 s. |
+| Esqueci a senha do acesso **local** | Ela não é recuperável (só o hash fica no navegador). Limpe `localStorage.licita_users` nas DevTools → a tela volta ao modo “criar acesso”. |
+| Cadastrei o acesso e em outro computador ele não existe | Esperado no modo local: os acessos vivem no navegador. Para acessos compartilhados, configure o Worker com `USERS`. |

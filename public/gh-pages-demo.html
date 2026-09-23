@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="locked">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -29,6 +29,12 @@ body{ background:var(--ink); color:#e8f0ed; font-family:Inter,system-ui,sans-ser
 .corner::before{ top:-1px; left:-1px; border-width:1.5px 0 0 1.5px; } .corner::after{ bottom:-1px; right:-1px; border-width:0 1.5px 1.5px 0; }
 .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 input[type=range]{ accent-color:var(--volt); }
+/* enquanto não houver sessão válida, nada do app fica visível/atingível (visibility também
+   tira do ordem de tab, então não dá para navegar até os campos com Tab) */
+html.locked > body > *:not(#authGate){ visibility:hidden; }
+html.locked, html.locked > body{ overflow:hidden !important; }
+@keyframes shakeX{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.shake{animation:shakeX .38s ease}
 .fade-in{ animation:fadeIn .35s ease both; } @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
 .toast{ animation:fadeIn .25s ease both; }
 progress::-webkit-progress-bar{ background:rgba(255,255,255,.08); border-radius:99px; }
@@ -36,6 +42,56 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
 </style>
 </head>
 <body class="antialiased">
+
+<!-- ============ TELA DE ACESSO (e-mail + senha) ============ -->
+<div id="authGate" class="fixed inset-0 z-[95] hidden overflow-y-auto bg-[#05080a] px-4 py-8">
+  <div class="bg-grid pointer-events-none absolute inset-0 opacity-70"></div>
+  <div class="relative mx-auto flex min-h-[80vh] w-full max-w-md flex-col justify-center fade-in">
+    <div class="glass corner rounded-3xl p-7">
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--volt)] text-lg text-[#05080a]">⚖</span>
+        <div>
+          <p class="font-display text-base font-bold tracking-tight text-white">LicitaPreço</p>
+          <p id="gateSubtitle" class="text-[11px] text-[var(--mist)]">entre com e-mail e senha para consultar</p>
+        </div>
+      </div>
+
+      <form id="gateForm" class="mt-6 space-y-3" novalidate>
+        <label class="block">
+          <span class="text-[11px] uppercase tracking-wider text-white/45">E-mail</span>
+          <input id="gateEmail" type="email" autocomplete="username" placeholder="seu.nome@orgao.gov.br"
+            class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+        </label>
+        <label class="block">
+          <span class="text-[11px] uppercase tracking-wider text-white/45">Senha</span>
+          <input id="gatePass" type="password" autocomplete="current-password" placeholder="••••••••••"
+            class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+        </label>
+        <div id="gateConfirmWrap" class="hidden">
+          <label class="block">
+            <span class="text-[11px] uppercase tracking-wider text-white/45">Confirme a senha</span>
+            <input id="gatePass2" type="password" autocomplete="new-password" placeholder="••••••••••"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+          </label>
+          <p class="mt-2 text-[11px] leading-relaxed text-white/40">Mínimo de 10 caracteres. Neste modo local, a senha fica salva <em>só neste navegador</em>, como resumo SHA-256 com salt — nada vai para servidor.</p>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-white/60">
+          <input id="gateRemember" type="checkbox" checked class="h-3.5 w-3.5 accent-[var(--volt)]" />
+          manter conectado neste dispositivo
+        </label>
+        <p id="gateMsg" class="hidden rounded-xl border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-200"></p>
+        <button id="gateSubmit" type="submit"
+          class="w-full rounded-xl bg-[var(--volt)] py-3 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.35)] disabled:cursor-not-allowed disabled:opacity-40">Entrar</button>
+      </form>
+
+      <div class="mt-4 flex items-center justify-between gap-2 text-[11px] text-white/45">
+        <button id="gateToggle" type="button" class="underline decoration-white/20 underline-offset-2 transition hover:text-[var(--volt)]">criar novo acesso</button>
+        <span id="gateMode" class="font-mono text-white/30">verificação local</span>
+      </div>
+    </div>
+    <p id="gateNote" class="mt-4 text-center text-[11px] leading-relaxed text-white/35"></p>
+  </div>
+</div>
 
 <!-- ============ HEADER ============ -->
 <header class="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-[#05080a]/80 backdrop-blur-xl">
@@ -50,6 +106,10 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
       <span id="statusDot" class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 sm:flex">
         <span id="statusPing" class="h-1.5 w-1.5 rounded-full blink bg-white/40"></span>
         <span id="statusText">conectando…</span>
+      </span>
+      <span id="btnUser" class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60" title="Sessão ativa">
+        <span id="userChip" class="max-w-[16ch] truncate font-mono"></span>
+        <button id="btnLogout" type="button" class="text-white/45 transition hover:text-rose-300" title="Sair desta sessão">sair</button>
       </span>
       <button id="btnKey" class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/70 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]" title="Configurar chave da IA (Gemini)">⚙ Chave IA</button>
     </div>
@@ -151,7 +211,8 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
       <li><em class="text-white/60">Opcional:</em> como a página é estática, a varredura das lojas passa por um proxy CORS. Os proxies públicos são instáveis — para uso sério, implante o proxy do repositório (<span class="font-mono text-[var(--volt)]">pages-proxy/worker.js</span> num Cloudflare Worker grátis) e cole a URL aqui.</li>
     </ol>
     <input id="keyInput" type="password" placeholder="deixe vazio = usar a chave do site" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
-    <input id="proxyInput" type="text" placeholder="https://meu-proxy.workers.dev/?url= (opcional)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <input id="serverInput" type="text" placeholder="https://SEU-PROXY.workers.dev/  (opcional: valida login, faz a IA e varre as lojas)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-[12px] text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <input id="proxyInput" type="text" placeholder="https://meu-proxy.workers.dev/?url= (só varredura, opcional)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
     <div class="mt-4 flex gap-2">
       <button id="saveKeyBtn" class="flex-1 rounded-xl bg-[var(--volt)] py-2.5 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.4)]">Salvar</button>
       <button id="closeKeyBtn" class="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/70 hover:text-white">Fechar</button>
@@ -248,30 +309,274 @@ const store = {
   /** proxy CORS próprio; vazio = tenta os proxies públicos (instáveis) */
   get proxy() { return localStorage.getItem("licita_proxy_url") || ""; },
   set proxy(v) { localStorage.setItem("licita_proxy_url", v.trim()); },
+  /**
+   * Servidor próprio (o Cloudflare Worker de pages-proxy/). Quando existe, o login é verificado
+   * lá, a chamada de IA passa por ele (a chave do Google nunca aparece no HTML) e a varredura
+   * das lojas também. Vazio = tudo no navegador, com a chave local.
+   */
+  get server() { return localStorage.getItem("licita_server_url") || ""; },
+  set server(v) { const x = (v || "").trim(); x ? localStorage.setItem("licita_server_url", x) : localStorage.removeItem("licita_server_url"); },
 };
 const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
 function refreshStatus() {
-  $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (store.key ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
+  const aiOk = AUTH.serverMode || Boolean(store.key);
+  $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (aiOk ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
   $("#statusDot").classList.remove("hidden"); $("#statusDot").classList.add("flex");
   const origemChave = !store.key ? null : store.key === PRESET_GEMINI_KEY ? "chave do site" : "sua chave local";
   $("#statusText").textContent = !origemChave
     ? "configure a chave da IA"
-    : "IA ativa · " + origemChave + " · " + (store.proxy ? "varredura pelo seu proxy" : "proxies públicos (instáveis)");
+    : "IA " + (AUTH.serverMode ? "via servidor" : "ativa · " + origemChave) + " · " +
+      (AUTH.serverMode || store.proxy ? "varredura própria" : "proxies públicos (instáveis)");
 }
-$("#btnKey").onclick = () => { $("#keyInput").value = localStorage.getItem("licita_gemini_key") || ""; $("#proxyInput").value = store.proxy; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
+$("#btnKey").onclick = () => { $("#keyInput").value = localStorage.getItem("licita_gemini_key") || ""; $("#serverInput").value = store.server; $("#proxyInput").value = store.proxy; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
 $("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
 $("#saveKeyBtn").onclick = () => {
   const v = $("#keyInput").value.trim();
   if (v && v.length < 10) { toast("Cole uma chave válida (ou deixe vazio para usar a do site).", false); return; }
   const px = $("#proxyInput").value.trim();
-  if (px && !/^https?:\/\//i.test(px)) { toast("A URL do proxy precisa começar com http(s)://", false); return; }
-  store.key = v; store.proxy = px; refreshStatus();
+  const sv = $("#serverInput").value.trim();
+  for (const [name, val] of [["proxy", px], ["servidor", sv]]) {
+    if (val && !/^https?:\/\//i.test(val)) { toast("A URL do " + name + " precisa começar com http(s)://", false); return; }
+  }
+  const prevMode = AUTH.mode;
+  if (sv && !v) toast("Servidor salvo: a IA passa a ser chamada por ele, sem chave aqui.");
+  store.key = v; store.proxy = px; store.server = sv; refreshStatus(); paintGate();
+  if (AUTH.mode !== prevMode) ensureAccess();
   $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex");
   toast((v ? "Chave salva no seu navegador." : "Usando a chave embutida no site.") + (px ? " Proxy salvo." : ""));
 };
 
+/* ------------------ controle de acesso (e-mail + senha) ------------------ */
+/**
+ * Dois modos com o mesmo formulário:
+ *  · "servidor" — store.server aponta para o Worker (pages-proxy/worker.js). O login é verificado
+ *    lá; a chave do Google fica num secret do Worker e não existe no HTML; a sessão é um token
+ *    HMAC assinado, com validade. É o modo que protege a cota de verdade.
+ *  · "local" — sem servidor: os acessos ficam no localStorage deste navegador, a senha como
+ *    SHA-256 com salt e o acesso é verificado aqui. Barreira contra uso casual, NÃO é segurança
+ *    (quem usa o próprio DevTools contorna). Sem WebCrypto (contexto inseguro), usa um resumo
+ *    mais fraco e avisa na tela.
+ */
+const AUTH = (() => {
+  const UKEY = "licita_users", SKEY = "licita_session", TKEY = "licita_throttle";
+  const KEEP_DAYS = 14, MAX_FAILS = 5, COOLDOWN_MS = 30_000;
+  const subtleOk = typeof crypto !== "undefined" && !!crypto.subtle?.digest;
+
+  async function digest(text) {
+    if (subtleOk) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    let h = 0x811c9dc5 >>> 0;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return "f" + h.toString(16);
+  }
+  const saltOf = () => Array.from(crypto.getRandomValues?.(new Uint8Array(16)) || new Uint8Array(16), (b) => b.toString(16).padStart(2, "0")).join("");
+  const hashPw = (pw, salt) => digest(salt + ":" + pw);
+  const readJson = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+  const setJson = (k, v) => (v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)));
+  const now = () => Date.now();
+
+  const base = () => (store_url() || "").trim().replace(/\/+$/, "") + "/";
+  function store_url() { try { return localStorage.getItem("licita_server_url") || ""; } catch { return ""; } }
+  const isServer = () => /^https?:\/\//i.test(store_url().trim());
+
+  function users() { return readJson(UKEY, []); }
+  function cooldownLeft() {
+    const t = readJson(TKEY, null);
+    if (!t || now() > t.until) return 0;
+    return t.until - now();
+  }
+  function noteFail() {
+    const t = readJson(TKEY, { n: 0, until: 0 });
+    t.n = (t.n || 0) + 1;
+    if (t.n >= MAX_FAILS) { t.until = now() + COOLDOWN_MS; t.n = 0; }
+    setJson(TKEY, t);
+  }
+
+  function sess() { try { return JSON.parse(sessionStorage.getItem(SKEY) || localStorage.getItem(SKEY) || "null"); } catch { return null; } }
+  function setSess(v, keep) {
+    sessionStorage.removeItem(SKEY); localStorage.removeItem(SKEY);
+    if (!v) return;
+    (keep ? localStorage : sessionStorage).setItem(SKEY, JSON.stringify(v));
+  }
+
+  let current = null;
+
+  /** valida a sessão guardada (no servidor, revalida o token; local, confere o resumo) */
+  async function restore() {
+    const s = sess();
+    if (!s?.email) return null;
+    if (Number(s.exp) && Number(s.exp) < now()) { setSess(null); return null; }
+    if (isServer()) {
+      try {
+        const r = await fetch(base() + "verify", { headers: { Authorization: "Bearer " + (s.token || "") } });
+        if (!r.ok) { setSess(null); return null; }
+        current = s; return s;
+      } catch {
+        setSess(null); return null; // sem o servidor não há como confirmar
+      }
+    }
+    const u = users().find((x) => x.email === s.email);
+    if (!u) { setSess(null); return null; }
+    if (s.token !== (await digest(u.hash + "|sess"))) { setSess(null); return null; }
+    current = s;
+    return s;
+  }
+
+  async function createAccess(email, pw) {
+    const e = String(email || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(e)) return { error: "Informe um e-mail válido." };
+    if (String(pw || "").length < 10) return { error: "A senha precisa de pelo menos 10 caracteres." };
+    const list = users();
+    if (list.some((u) => u.email === e)) return { error: "Já existe acesso com este e-mail neste navegador — entre em vez de criar." };
+    const salt = saltOf();
+    const hash = await hashPw(pw, salt);
+    list.push({ email: e, salt, hash, createdAt: new Date().toISOString() });
+    setJson(UKEY, list);
+    return { ok: true, email: e };
+  }
+
+  async function login(email, pw, keep) {
+    const e = String(email || "").trim().toLowerCase();
+    const left = cooldownLeft();
+    if (left > 0) return { error: `Muitas tentativas. Aguarde ${Math.ceil(left / 1000)} s.` };
+    if (!e || !pw) return { error: "Preencha e-mail e senha." };
+
+    if (isServer()) {
+      try {
+        const r = await fetch(base() + "login", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: e, password: pw }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) return { error: d.error || "E-mail ou senha inválidos." };
+        setSess({ email: d.email || e, token: d.token, exp: Number(d.exp) || now() + KEEP_DAYS * 864e5 }, keep);
+        current = sess();
+        return { ok: true, email: current.email };
+      } catch {
+        return { error: "Servidor de autenticação inacessível. Confira a URL em ⚙ ou use em modo local." };
+      }
+    }
+
+    const u = users().find((x) => x.email === e);
+    if (!u || (await hashPw(pw, u.salt)) !== u.hash) { noteFail(); return { error: "E-mail ou senha inválidos." }; }
+    setJson(TKEY, null);
+    const token = await digest(u.hash + "|sess");
+    setSess({ email: e, token, exp: now() + (keep ? KEEP_DAYS : 1) * 864e5 }, keep);
+    current = sess();
+    return { ok: true, email: e };
+  }
+
+  function signOut() { current = null; setSess(null); }
+
+  return {
+    get mode() { return isServer() ? "servidor" : "local"; },
+    get serverBase() { return base(); },
+    get serverMode() { return isServer(); },
+    get email() { return current?.email || ""; },
+    get token() { return current?.token || ""; },
+    get weakHash() { return !subtleOk; },
+    users, restore, login, createAccess, signOut,
+    get enrolled() { return users().length; },
+  };
+})();
+
+/* ------------------ tela de acesso: pintura e eventos ------------------ */
+let gateMode = "login";
+function gateError(msg) {
+  const el = $("gateMsg");
+  if (!msg) { el.classList.add("hidden"); return; }
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  const card = document.querySelector("#authGate .glass");
+  card?.classList.remove("shake");
+  void card?.offsetWidth;
+  card?.classList.add("shake");
+}
+function paintGate() {
+  const firstRun = AUTH.mode === "local" && AUTH.enrolled === 0;
+  gateMode = firstRun ? "create" : gateMode;
+  const creating = gateMode === "create";
+  $("gateSubtitle").textContent = creating
+    ? "primeiro uso: defina o e-mail e a senha deste acesso"
+    : "entre com e-mail e senha para consultar";
+  $("gateConfirmWrap").classList.toggle("hidden", !creating);
+  $("gateSubmit").textContent = creating ? "Criar acesso e entrar" : "Entrar";
+  $("gatePass").autocomplete = creating ? "new-password" : "current-password";
+  $("gateToggle").classList.toggle("hidden", creating && AUTH.enrolled === 0);
+  $("gateToggle").textContent = creating ? "já tenho acesso" : "criar novo acesso";
+  $("gateMode").textContent = AUTH.mode === "servidor" ? "verificado no servidor" : "verificação local";
+  $("gateNote").innerHTML = AUTH.mode === "servidor"
+    ? `Login validado pelo seu servidor <span class="font-mono text-white/45">${esc(AUTH.serverBase.replace(/^https:\/\//, ""))}</span> — a chave da IA fica fora do navegador.`
+    : (AUTH.weakHash
+        ? "Modo local: sem HTTPS/WebCrypto neste contexto, o resumo da senha é mais fraco. Para validação de verdade, configure o servidor em ⚙."
+        : "Modo local: os acessos existem só neste navegador (senha guardada como SHA-256 + salt). Contra uso casual — para proteger a cota da IA, use o servidor (pages-proxy/).");
+  $("gateSubmit").disabled = false;
+}
+async function ensureAccess() {
+  const s = await AUTH.restore();
+  const locked = !s;
+  document.documentElement.classList.toggle("locked", locked);
+  $("authGate").classList.toggle("hidden", !locked);
+  $("authGate").classList.toggle("flex", locked);
+  $("btnUser").classList.toggle("hidden", locked);
+  $("btnUser").classList.toggle("flex", !locked);
+  if (!locked) {
+    $("userChip").textContent = s.email;
+    document.querySelectorAll(".fade-in").forEach((el) => el.classList.remove("hidden"));
+  } else {
+    $("gatePass").value = ""; $("gatePass2").value = "";
+    paintGate();
+    setTimeout(() => $("gateEmail").focus(), 80);
+  }
+  return !locked;
+}
+$("gateForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const email = $("gateEmail").value, pass = $("gatePass").value, keep = $("gateRemember").checked;
+  gateError(null);
+  const btn = $("gateSubmit");
+  btn.disabled = true; btn.textContent = "Verificando…";
+  try {
+    if (gateMode === "create") {
+      if (pass !== $("gatePass2").value) { gateError("As senhas não conferem."); return; }
+      const c = await AUTH.createAccess(email, pass);
+      if (c.error) { gateError(c.error); return; }
+    }
+    const r = await AUTH.login(email, pass, keep);
+    if (r.error) { gateError(r.error); return; }
+    toast("Acesso liberado." + (gateMode === "create" ? " Salvo neste navegador." : ""));
+    await ensureAccess();
+    if (!store.key && !AUTH.serverMode) setTimeout(showKeyModal, 400);
+  } finally {
+    btn.disabled = false;
+    paintGate();
+  }
+};
+$("gateToggle").onclick = () => { gateMode = gateMode === "create" ? "login" : "create"; gateError(null); paintGate(); };
+$("btnLogout").onclick = () => { AUTH.signOut(); location.reload(); };
+
 /* ------------------ chamadas à IA ------------------ */
 async function geminiCall(parts, maxTokens = 8192) {
+  if (AUTH.serverMode) {
+    if (!AUTH.token) { ensureAccess(); throw new Error("Sua sessão expirou — entre de novo para consultar."); }
+    let res, data = {};
+    try {
+      res = await fetch(AUTH.serverBase + "gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + AUTH.token },
+        body: JSON.stringify({ contents: [{ role: "user", parts }], config: { maxOutputTokens: maxTokens } }),
+      });
+      data = await res.json().catch(() => ({}));
+    } catch {
+      throw new Error("Servidor de IA inacessível (URL em ⚙?). Remova o campo para usar a chave salva no navegador.");
+    }
+    if (res.status === 401) { AUTH.signOut(); ensureAccess(); throw new Error("Sua sessão expirou — entre de novo para consultar."); }
+    if (!res.ok) throw new Error(data.error || "A IA falhou pelo servidor (HTTP " + res.status + (data.detail ? ": " + data.detail : "") + ").");
+    if (!data.text) throw new Error("O servidor devolveu a resposta da IA vazia.");
+    return { text: data.text, model: data.model || "servidor" };
+  }
   if (!store.key) {
     showKeyModal();
     throw new Error("Falta só a chave da IA — cole uma vez em ⚙ Chave IA (aistudio.google.com/apikey) e ela fica salva neste navegador.");
@@ -312,9 +617,12 @@ const PUBLIC_PROXIES = ["https://api.cors.lol/?url=", "https://api.allorigins.wi
 /** transportes usados na varredura — permite dizer POR QUE não houve ofertas */
 const proxyHealth = { ok: 0, fail: 0, hosts: new Set(), custom: false };
 function proxyList() {
+  const out = [];
+  if (AUTH.serverMode) out.push({ px: AUTH.serverBase + "?url=", auth: true, label: "seu servidor" });
   const custom = store.proxy.trim();
-  if (custom) proxyHealth.custom = true;
-  return (custom ? [custom] : []).concat(PUBLIC_PROXIES);
+  if (custom) { proxyHealth.custom = true; out.push({ px: custom, auth: custom.startsWith(AUTH.serverBase) }); }
+  for (const px of PUBLIC_PROXIES) out.push({ px });
+  return out;
 }
 function buildProxyUrl(px, url) {
   if (px.includes("{url}")) return px.split("{url}").join(encodeURIComponent(url));
@@ -322,17 +630,18 @@ function buildProxyUrl(px, url) {
   return px + encodeURIComponent(url).replace(/%2F/g, "/").replace(/%3A/g, ":");
 }
 async function proxied(url, timeoutMs = 16000) {
-  for (const px of proxyList()) {
+  for (const { px, auth, label } of proxyList()) {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs);
-      const res = await fetch(buildProxyUrl(px, url), { signal: ctl.signal });
+      const headers = auth && AUTH.token ? { Authorization: "Bearer " + AUTH.token } : undefined;
+      const res = await fetch(buildProxyUrl(px, url), { signal: ctl.signal, ...(headers ? { headers } : {}) });
       clearTimeout(t);
       if (res.ok) {
         const txt = await res.text();
         if (txt.length > 300) { proxyHealth.ok++; return txt; }
       }
-      proxyHealth.fail++; proxyHealth.hosts.add(String(px).replace(/^https?:\/\//, "").split(/[/?]/)[0]);
-    } catch { proxyHealth.fail++; proxyHealth.hosts.add(String(px).replace(/^https?:\/\//, "").split(/[/?]/)[0]); }
+      proxyHealth.fail++; proxyHealth.hosts.add(label || String(px).replace(/^https?:\/\//, "").split(/[/?]/)[0]);
+    } catch { proxyHealth.fail++; proxyHealth.hosts.add(label || String(px).replace(/^https?:\/\//, "").split(/[/?]/)[0]); }
   }
   return null;
 }
@@ -600,6 +909,10 @@ O usuário exige no mínimo ${filters.minScore}% de atendimento — estime a por
 
 /* ------------------ motor principal ------------------ */
 async function runAnalysis(editalText, filters) {
+  if (document.documentElement.classList.contains("locked")) {
+    ensureAccess();
+    throw new Error("Entre com e-mail e senha para consultar.");
+  }
   const plan = await planSearch(editalText, filters);
   setStep("Varrendo lojas e comparadores do Brasil…");
   const clean = [...new Set(plan.queries.map(storeQuery).filter(q => q.length > 3))].slice(0, 3);
@@ -1232,14 +1545,21 @@ $("#sitesMarquee").innerHTML = [...SITES, ...SITES].map(s => `<span class="flex 
 
 /* aceita a chave por #chave=… — permite favoritar o link e nunca mais digitar nada,
    sem colocar a chave no código público do repositório (ela vai só para o seu navegador) */
-(function adoptKeyFromHash() {
-  const m = location.hash.match(/[#&]chave=([^&\s]+)/);
-  if (!m) return;
-  const k = decodeURIComponent(m[1]).trim();
-  if (k.length < 10) return;
-  store.key = k;
+(function adoptConfigFromHash() {
+  const grab = (name) => {
+    const m = location.hash.match(new RegExp("[#&]" + name + "=([^&\s]+)"));
+    return m ? decodeURIComponent(m[1]).trim() : "";
+  };
+  const k = grab("chave");
+  const sv = grab("servidor");
+  const px = grab("proxy");
+  if (!k && !sv && !px) return;
+  const notes = [];
+  if (k.length >= 10) { store.key = k; notes.push("chave da IA"); }
+  if (/^https?:\/\//i.test(sv)) { store.server = sv; notes.push("servidor (login + IA + varredura)"); }
+  if (/^https?:\/\//i.test(px)) { store.proxy = px; notes.push("proxy de varredura"); }
   history.replaceState(null, "", location.pathname + location.search);
-  setTimeout(() => toast("Chave salva no seu navegador — não precisa colar de novo."), 400);
+  if (notes.length) setTimeout(() => toast("Salvo no seu navegador: " + notes.join(", ") + ". Não precisa digitar de novo."), 400);
 })();
 
 /* boot */
@@ -1249,7 +1569,7 @@ renderHistory();
 try { const trSaved = JSON.parse(localStorage.getItem(TRKEY) || "null"); if (trSaved) { tr = trSaved; tr.runningAll = false; } } catch { }
 renderTr();
 renderImageZone();
-if (!store.key) setTimeout(showKeyModal, 600);
+ensureAccess().then((ok) => { if (ok && !store.key && !AUTH.serverMode) setTimeout(showKeyModal, 500); });
 </script>
 </body>
 </html>
