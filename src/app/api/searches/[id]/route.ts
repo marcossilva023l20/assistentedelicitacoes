@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { searches, searchResults } from "@/db/schema";
 import type { SearchDetail } from "@/lib/shared";
+import { memoryStore } from "@/lib/memory-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,13 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+
+  if (!isDbConfigured || !db) {
+    const s = memoryStore.getSearch(id);
+    if (!s) return NextResponse.json({ error: "Pesquisa não encontrada." }, { status: 404 });
+    return NextResponse.json({ search: s });
+  }
+
   const [search] = await db.select().from(searches).where(eq(searches.id, id)).limit(1);
   if (!search) return NextResponse.json({ error: "Pesquisa não encontrada." }, { status: 404 });
 
@@ -56,6 +64,10 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function DELETE(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+  if (!isDbConfigured || !db) {
+    memoryStore.deleteSearch(id);
+    return NextResponse.json({ ok: true });
+  }
   await db.delete(searches).where(eq(searches.id, id));
   return NextResponse.json({ ok: true });
 }
