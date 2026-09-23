@@ -201,18 +201,19 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
 <!-- ============ MODAL DA CHAVE ============ -->
 <div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
   <div class="glass w-full max-w-md rounded-3xl p-6">
-    <h3 class="font-display text-lg font-bold text-white">Chave da IA e varredura das lojas</h3>
-    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Esta página roda 100% no seu navegador e <strong class="text-white">já vem com a chave da IA embutida</strong> — não precisa colar nada para consultar. Deixe os campos abaixo vazios para usar a do site.</p>
-    <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-white/75">
-      <li>Quer usar <em>sua</em> chave (recomendado para uso intenso)? Gere em <span class="font-mono text-[var(--volt)]">aistudio.google.com</span> e cole abaixo: fica só no seu dispositivo e tem prioridade sobre a embutida.</li>
-      <li>Deixe vazio e clique em Salvar para usar a chave do site. Se o site ainda não tiver uma
-          (o deploy injeta a chave a partir do secret <span class="font-mono text-[var(--volt)]">GEMINI_API_KEY</span> do Actions),
-          cole a sua aqui uma única vez — fica salva neste navegador e nunca mais é pedida.</li>
-      <li><em class="text-white/60">Opcional:</em> como a página é estática, a varredura das lojas passa por um proxy CORS. Os proxies públicos são instáveis — para uso sério, implante o proxy do repositório (<span class="font-mono text-[var(--volt)]">pages-proxy/worker.js</span> num Cloudflare Worker grátis) e cole a URL aqui.</li>
+    <h3 class="font-display text-lg font-bold text-white">Acesso, chave da IA e varredura das lojas</h3>
+    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Você já entrou com e-mail e senha. Falta só dizer de onde vem a IA: este site <strong class="text-white">não traz chave embutida</strong> (o GitHub bloqueia chave de API no código público), então escolha uma das rotas. Tudo aqui fica salvo <em>no seu navegador</em> — nada é enviado para um servidor nosso.</p>
+    <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-white/75">
+      <li><strong class="text-white/90">Sua chave, uma vez:</strong> gere em <span class="font-mono text-[var(--volt)]">aistudio.google.com/apikey</span> e cole em <em>Chave da IA</em>. Nunca mais é pedida neste dispositivo (e vale para o seu e-mail cadastrado na tela de acesso).</li>
+      <li><strong class="text-white/90">Chave para todos os visitantes:</strong> crie o secret <span class="font-mono text-[var(--volt)]">GEMINI_API_KEY</span> em <em>Settings → Secrets and variables → Actions</em> e deixe o workflow <span class="font-mono text-[var(--volt)]">pages.yml</span> ativo na branch que o Pages publica — o deploy injeta a chave no arquivo publicado, sem ela nunca ir ao repositório.</li>
+      <li><strong class="text-white/90">Servidor (recomendado):</strong> publique <span class="font-mono text-[var(--volt)]">pages-proxy/worker.js</span> num Cloudflare Worker grátis e cole a URL em <em>Servidor</em>. A chave fica só no Worker (o HTML não leva nada), a IA é chamada por ele, o login é validado por ele e a varredura das lojas também. <em class="text-white/60">Sem esse campo, a varredura depende dos proxies CORS públicos, hoje instáveis.</em></li>
     </ol>
-    <input id="keyInput" type="password" placeholder="deixe vazio = usar a chave do site" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
-    <input id="serverInput" type="text" placeholder="https://SEU-PROXY.workers.dev/  (opcional: valida login, faz a IA e varre as lojas)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-[12px] text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
-    <input id="proxyInput" type="text" placeholder="https://meu-proxy.workers.dev/?url= (só varredura, opcional)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <span class="mt-4 block text-[11px] uppercase tracking-wider text-white/45">Chave da IA (opcional)</span>
+    <input id="keyInput" type="password" placeholder="AIza… — fica só neste navegador; vazio = usar o servidor" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <span class="mt-3 block text-[11px] uppercase tracking-wider text-white/45">Servidor do site — Worker (opcional)</span>
+    <input id="serverInput" type="text" placeholder="https://SEU-PROXY.workers.dev/  (valida o login, faz a IA e varre as lojas)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-[12px] text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <span class="mt-3 block text-[11px] uppercase tracking-wider text-white/45">Proxy só de varredura (opcional)</span>
+    <input id="proxyInput" type="text" placeholder="https://meu-proxy.workers.dev/?url=" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
     <div class="mt-4 flex gap-2">
       <button id="saveKeyBtn" class="flex-1 rounded-xl bg-[var(--volt)] py-2.5 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.4)]">Salvar</button>
       <button id="closeKeyBtn" class="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/70 hover:text-white">Fechar</button>
