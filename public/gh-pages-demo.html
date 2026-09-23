@@ -2,7 +2,7 @@
 <html lang="pt-BR" class="locked">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>LicitaPreço — Do edital ao menor preço</title>
 <meta name="description" content="Cole o item do edital e receba as melhores ofertas do varejo brasileiro que atendem o edital, ordenadas pelo menor preço, com links reais. Versão estática (GitHub Pages)." />
 <script src="https://cdn.tailwindcss.com"></script>
@@ -33,6 +33,15 @@ input[type=range]{ accent-color:var(--volt); }
    tira do ordem de tab, então não dá para navegar até os campos com Tab) */
 html.locked > body > *:not(#authGate){ visibility:hidden; }
 html.locked, html.locked > body{ overflow:hidden !important; }
+/* o portão é visível por padrão no HTML: se o script principal não rodar (navegador antigo,
+   WebView do WhatsApp/Instagram, modo privado), aparece a tela de acesso com aviso em vez de
+   uma tela preta. Ele só é escondido pelo estado acima, nunca por uma classe que dependa do JS. */
+html:not(.locked) > body > #authGate{ display:none; }
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+#authGate{ padding-bottom:max(2rem, env(safe-area-inset-bottom)); }
+@media (max-height:720px){ #authGate{ padding-top:1rem; } #authGate > div{ min-height:0; } #authGate .glass{ padding:1.25rem; } }
+/* iOS dá zoom em qualquer campo com fonte < 16px — isso empurra o formulário para fora da tela */
+@media (max-width:640px){ input, select, textarea{ font-size:16px !important; } }
 @keyframes shakeX{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
 .shake{animation:shakeX .38s ease}
 .fade-in{ animation:fadeIn .35s ease both; } @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
@@ -44,7 +53,7 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
 <body class="antialiased">
 
 <!-- ============ TELA DE ACESSO (e-mail + senha) ============ -->
-<div id="authGate" class="fixed inset-0 z-[95] hidden overflow-y-auto bg-[#05080a] px-4 py-8">
+<div id="authGate" class="fixed inset-0 z-[95] overflow-y-auto bg-[#05080a] px-4 py-8">
   <div class="bg-grid pointer-events-none absolute inset-0 opacity-70"></div>
   <div class="relative mx-auto flex min-h-[80vh] w-full max-w-md flex-col justify-center fade-in">
     <div class="glass corner rounded-3xl p-7">
@@ -59,18 +68,18 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
       <form id="gateForm" class="mt-6 space-y-3" novalidate>
         <label class="block">
           <span class="text-[11px] uppercase tracking-wider text-white/45">E-mail</span>
-          <input id="gateEmail" type="email" autocomplete="username" placeholder="seu.nome@orgao.gov.br"
+          <input id="gateEmail" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="next" aria-describedby="gateMsg" placeholder="seu.nome@orgao.gov.br"
             class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
         </label>
         <label class="block">
           <span class="text-[11px] uppercase tracking-wider text-white/45">Senha</span>
-          <input id="gatePass" type="password" autocomplete="current-password" placeholder="••••••••••"
+          <input id="gatePass" type="password" autocomplete="current-password" enterkeyhint="next" placeholder="••••••••••"
             class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
         </label>
         <div id="gateConfirmWrap" class="hidden">
           <label class="block">
             <span class="text-[11px] uppercase tracking-wider text-white/45">Confirme a senha</span>
-            <input id="gatePass2" type="password" autocomplete="new-password" placeholder="••••••••••"
+            <input id="gatePass2" type="password" autocomplete="new-password" enterkeyhint="go" placeholder="••••••••••"
               class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
           </label>
           <p class="mt-2 text-[11px] leading-relaxed text-white/40">Mínimo de 10 caracteres. Neste modo local, a senha fica salva <em>só neste navegador</em>, como resumo SHA-256 com salt — nada vai para servidor.</p>
@@ -79,6 +88,7 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
           <input id="gateRemember" type="checkbox" checked class="h-3.5 w-3.5 accent-[var(--volt)]" />
           manter conectado neste dispositivo
         </label>
+        <p id="gateDead" class="hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-[11px] leading-relaxed text-rose-200"></p>
         <p id="gateMsg" class="hidden rounded-xl border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-200"></p>
         <button id="gateSubmit" type="submit"
           class="w-full rounded-xl bg-[var(--volt)] py-3 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.35)] disabled:cursor-not-allowed disabled:opacity-40">Entrar</button>
@@ -229,6 +239,35 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
   </div>
 </div>
 
+<script>
+/* Decide o estado do portão ANTES da primeira pintura e avisa se o app não ligar.
+   Script clássico de propósito: roda mesmo em navegador que ignora type="module". */
+(function () {
+  var d = document.documentElement;
+  // acesso cru de propósito: LS/SS do módulo ainda não existem aqui
+  var read = function (k) {
+    try { return (window.sessionStorage.getItem(k) || window.localStorage.getItem(k)); } catch (e) { return null; }
+  };
+  var ok = false;
+  try {
+    var s = JSON.parse(read("licita_session") || "null");
+    ok = !!(s && s.email && s.token && (!s.exp || s.exp > Date.now()));
+  } catch (e) { ok = false; }
+  if (ok) d.classList.remove("locked");
+  var dead = function (msg) {
+    var n = document.getElementById("gateDead");
+    if (!n) return;
+    n.textContent = msg; n.classList.remove("hidden");
+  };
+  window.addEventListener("error", function (e) {
+    if (d.__licitaBooted) return;
+    dead("O script do site não rodou neste navegador" + ((e && e.message) ? ": " + e.message : "") +
+      ". Atualize o Chrome/Safari, saia do modo privado e recarregue.");
+  }, true);
+  setTimeout(function () { if (!d.__licitaBooted) dead("O site não respondeu neste navegador. Abra no Chrome ou Safari (dentro do WhatsApp/Instagram alguns recursos são bloqueados), saia do modo privado e recarregue."); }, 2500);
+})();
+</script>
+
 <script type="module">
 /* ================================================================
    LicitaPreço estático — engine 100% no navegador
@@ -236,6 +275,27 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
    ================================================================ */
 
 /* ------------------ estado / utilidades ------------------ */
+document.documentElement.__licitaBooted = true;
+document.getElementById("gateDead")?.classList.add("hidden");
+
+/* Modo privado e o WebView interno do WhatsApp/Instagram fazem localStorage LANCER erro — sem
+   esta camada o script morria na primeira linha e o site ficava uma tela preta no celular.
+   Cai para um depósito em memória (funciona na sessão, não sobrevive ao fechar). */
+const mkMemStore = () => {
+  const m = new Map();
+  return { __memory: true, getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+};
+const LS = (() => {
+  try { const s = window.localStorage; s.setItem("__licita_probe", "1"); s.removeItem("__licita_probe"); return s; } catch { return mkMemStore(); }
+})();
+const SS = (() => {
+  try { const s = window.sessionStorage; s.setItem("__licita_probe", "1"); s.removeItem("__licita_probe"); return s; } catch { return mkMemStore(); }
+})();
+const STORAGE_BLOCKED = Boolean(LS.__memory && SS.__memory);
+
+/* iOS Safari em aba de fundo pode lançar em getItem() mesmo com o storage disponível */
+const safeGet = (k) => { try { return LS.getItem(k); } catch { return null; } };
+
 const $ = (s) => document.querySelector(s);
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const fmtBRL = (v) => (v == null || !Number.isFinite(v) ? "—" : BRL.format(v));
@@ -304,19 +364,19 @@ function parseBRL(raw) {
  */
 const PRESET_GEMINI_KEY = "";
 const store = {
-  get key() { return localStorage.getItem("licita_gemini_key") || PRESET_GEMINI_KEY; },
+  get key() { return safeGet("licita_gemini_key") || PRESET_GEMINI_KEY; },
   /** vazio = volta a usar a chave embutida no site */
-  set key(v) { const x = (v || "").trim(); x ? localStorage.setItem("licita_gemini_key", x) : localStorage.removeItem("licita_gemini_key"); },
+  set key(v) { const x = (v || "").trim(); try { x ? LS.setItem("licita_gemini_key", x) : LS.removeItem("licita_gemini_key"); } catch { } },
   /** proxy CORS próprio; vazio = tenta os proxies públicos (instáveis) */
-  get proxy() { return localStorage.getItem("licita_proxy_url") || ""; },
-  set proxy(v) { localStorage.setItem("licita_proxy_url", v.trim()); },
+  get proxy() { return safeGet("licita_proxy_url") || ""; },
+  set proxy(v) { try { LS.setItem("licita_proxy_url", v.trim()); } catch { } },
   /**
    * Servidor próprio (o Cloudflare Worker de pages-proxy/). Quando existe, o login é verificado
    * lá, a chamada de IA passa por ele (a chave do Google nunca aparece no HTML) e a varredura
    * das lojas também. Vazio = tudo no navegador, com a chave local.
    */
-  get server() { return localStorage.getItem("licita_server_url") || ""; },
-  set server(v) { const x = (v || "").trim(); x ? localStorage.setItem("licita_server_url", x) : localStorage.removeItem("licita_server_url"); },
+  get server() { return safeGet("licita_server_url") || ""; },
+  set server(v) { const x = (v || "").trim(); try { x ? LS.setItem("licita_server_url", x) : LS.removeItem("licita_server_url"); } catch { } },
 };
 const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
 function refreshStatus() {
@@ -329,7 +389,7 @@ function refreshStatus() {
     : "IA " + (AUTH.serverMode ? "via servidor" : "ativa · " + origemChave) + " · " +
       (AUTH.serverMode || store.proxy ? "varredura própria" : "proxies públicos (instáveis)");
 }
-$("#btnKey").onclick = () => { $("#keyInput").value = localStorage.getItem("licita_gemini_key") || ""; $("#serverInput").value = store.server; $("#proxyInput").value = store.proxy; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
+$("#btnKey").onclick = () => { $("#keyInput").value = safeGet("licita_gemini_key") || ""; $("#serverInput").value = store.server; $("#proxyInput").value = store.proxy; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
 $("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
 $("#saveKeyBtn").onclick = () => {
   const v = $("#keyInput").value.trim();
@@ -374,12 +434,12 @@ const AUTH = (() => {
   }
   const saltOf = () => Array.from(crypto.getRandomValues?.(new Uint8Array(16)) || new Uint8Array(16), (b) => b.toString(16).padStart(2, "0")).join("");
   const hashPw = (pw, salt) => digest(salt + ":" + pw);
-  const readJson = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
-  const setJson = (k, v) => (v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)));
+  const readJson = (k, d) => { try { return JSON.parse(LS.getItem(k)) ?? d; } catch { return d; } };
+  const setJson = (k, v) => (v == null ? LS.removeItem(k) : LS.setItem(k, JSON.stringify(v)));
   const now = () => Date.now();
 
   const base = () => (store_url() || "").trim().replace(/\/+$/, "") + "/";
-  function store_url() { try { return localStorage.getItem("licita_server_url") || ""; } catch { return ""; } }
+  function store_url() { try { return LS.getItem("licita_server_url") || ""; } catch { return ""; } }
   const isServer = () => /^https?:\/\//i.test(store_url().trim());
 
   function users() { return readJson(UKEY, []); }
@@ -395,11 +455,11 @@ const AUTH = (() => {
     setJson(TKEY, t);
   }
 
-  function sess() { try { return JSON.parse(sessionStorage.getItem(SKEY) || localStorage.getItem(SKEY) || "null"); } catch { return null; } }
+  function sess() { try { return JSON.parse(SS.getItem(SKEY) || LS.getItem(SKEY) || "null"); } catch { return null; } }
   function setSess(v, keep) {
-    sessionStorage.removeItem(SKEY); localStorage.removeItem(SKEY);
+    SS.removeItem(SKEY); LS.removeItem(SKEY);
     if (!v) return;
-    (keep ? localStorage : sessionStorage).setItem(SKEY, JSON.stringify(v));
+    (keep ? LS : SS).setItem(SKEY, JSON.stringify(v));
   }
 
   let current = null;
@@ -478,6 +538,7 @@ const AUTH = (() => {
     get email() { return current?.email || ""; },
     get token() { return current?.token || ""; },
     get weakHash() { return !subtleOk; },
+    get storageBlocked() { return STORAGE_BLOCKED; },
     users, restore, login, createAccess, signOut,
     get enrolled() { return users().length; },
   };
@@ -508,11 +569,13 @@ function paintGate() {
   $("gateToggle").classList.toggle("hidden", creating && AUTH.enrolled === 0);
   $("gateToggle").textContent = creating ? "já tenho acesso" : "criar novo acesso";
   $("gateMode").textContent = AUTH.mode === "servidor" ? "verificado no servidor" : "verificação local";
-  $("gateNote").innerHTML = AUTH.mode === "servidor"
+  $("gateNote").innerHTML = (AUTH.storageBlocked
+    ? "<span class=\"text-rose-300\">Este navegador bloqueou o armazenamento (modo privado ou app interno): o acesso vale só até fechar a página. Abra no Chrome/Safari normal para salvar.</span> "
+    : "") + (AUTH.mode === "servidor"
     ? `Login validado pelo seu servidor <span class="font-mono text-white/45">${esc(AUTH.serverBase.replace(/^https:\/\//, ""))}</span> — a chave da IA fica fora do navegador.`
     : (AUTH.weakHash
         ? "Modo local: sem HTTPS/WebCrypto neste contexto, o resumo da senha é mais fraco. Para validação de verdade, configure o servidor em ⚙."
-        : "Modo local: os acessos existem só neste navegador (senha guardada como SHA-256 + salt). Contra uso casual — para proteger a cota da IA, use o servidor (pages-proxy/).");
+        : "Modo local: os acessos existem só neste navegador (senha guardada como SHA-256 + salt). Contra uso casual — para proteger a cota da IA, use o servidor (pages-proxy/)."));
   $("gateSubmit").disabled = false;
 }
 async function ensureAccess() {
@@ -555,6 +618,12 @@ $("gateForm").onsubmit = async (e) => {
     paintGate();
   }
 };
+$("#authGate")?.addEventListener("focusin", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+    setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+  }
+});
 $("gateToggle").onclick = () => { gateMode = gateMode === "create" ? "login" : "create"; gateError(null); paintGate(); };
 $("btnLogout").onclick = () => { AUTH.signOut(); location.reload(); };
 
@@ -1198,15 +1267,15 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); runSearch(); }
 });
 $("#editalInput").oninput = (e) => { $("#charCount").textContent = `${e.target.value.length}/8000`; };
-function showKeyModal() { $("#keyInput").value = localStorage.getItem("licita_gemini_key") || ""; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
+function showKeyModal() { $("#keyInput").value = safeGet("licita_gemini_key") || ""; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
 
 /* ------------------ histórico (localStorage) ------------------ */
 const HKEY = "licita_historico_v1";
-function loadHistory() { try { return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch { return []; } }
+function loadHistory() { try { return JSON.parse(LS.getItem(HKEY) || "[]"); } catch { return []; } }
 function saveHistory(r) {
   const h = loadHistory();
   h.unshift(r);
-  localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 40)));
+  LS.setItem(HKEY, JSON.stringify(h.slice(0, 40)));
 }
 function renderHistory() {
   const h = loadHistory();
@@ -1220,7 +1289,7 @@ function renderHistory() {
     <button id="btnDeleteAll" class="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 transition hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300">🗑 Limpar histórico</button>`;
   $("#btnDeleteAll").onclick = () => {
     if (!confirm("Apagar TODAS as cotações salvas neste navegador?")) return;
-    localStorage.removeItem(HKEY); renderHistory(); toast("Histórico esvaziado.");
+    LS.removeItem(HKEY); renderHistory(); toast("Histórico esvaziado.");
   };
   $("#historyPanel").innerHTML = `
   <ul class="glass divide-y divide-white/5 overflow-hidden rounded-3xl">
@@ -1249,7 +1318,7 @@ function renderHistory() {
   document.querySelectorAll(".histDel").forEach(el => el.onclick = (e) => {
     e.stopPropagation();
     const h = loadHistory().filter(x => x.id !== el.dataset.id);
-    localStorage.setItem(HKEY, JSON.stringify(h));
+    LS.setItem(HKEY, JSON.stringify(h));
     renderHistory(); toast("Cotação excluída.");
   });
 }
@@ -1529,9 +1598,9 @@ async function copyTrReport() {
 }
 const TRKEY = "licita_tr_v1";
 function saveTrState() {
-  if (!tr) { localStorage.removeItem(TRKEY); return; }
+  if (!tr) { LS.removeItem(TRKEY); return; }
   const slim = tr.items.map(i => ({ ...i, result: i.result ? i.result : null }));
-  try { localStorage.setItem(TRKEY, JSON.stringify({ filename: tr.filename, items: slim, runningAll: false, stopAll: false })); } catch { }
+  try { LS.setItem(TRKEY, JSON.stringify({ filename: tr.filename, items: slim, runningAll: false, stopAll: false })); } catch { }
 }
 
 /* ------------------ exemplos + marquee + boot ------------------ */
@@ -1567,7 +1636,7 @@ $("#sitesMarquee").innerHTML = [...SITES, ...SITES].map(s => `<span class="flex 
 refreshStatus();
 showEmpty();
 renderHistory();
-try { const trSaved = JSON.parse(localStorage.getItem(TRKEY) || "null"); if (trSaved) { tr = trSaved; tr.runningAll = false; } } catch { }
+try { const trSaved = JSON.parse(LS.getItem(TRKEY) || "null"); if (trSaved) { tr = trSaved; tr.runningAll = false; } } catch { }
 renderTr();
 renderImageZone();
 ensureAccess().then((ok) => { if (ok && !store.key && !AUTH.serverMode) setTimeout(showKeyModal, 500); });

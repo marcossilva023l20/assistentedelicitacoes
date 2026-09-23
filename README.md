@@ -107,6 +107,12 @@ A página abre com uma tela de acesso. Dois modos, o próprio site decide:
   revalidada em `GET /verify` a cada abertura e os visitantes param de receber pedido de chave porque a
   IA é chamada pelo Worker (`POST /gemini`). Configuração completa em [`pages-proxy/LEIA-ME.md`](pages-proxy/LEIA-ME.md).
 
+No celular funciona igual, com três cuidados: o cartão de acesso é visível **antes** de qualquer
+script (uma tela preta nunca é o estado "carregando"), os campos têm `font-size: 16px` em telas
+pequenas para o iOS não dar zoom, e `viewport-fit=cover` + `env(safe-area-inset-bottom)` tiram o
+botão de trás da barra de gestos. O armazenamento é acessado por uma camada que degrada para memória
+quando o navegador o bloqueia.
+
 **Honestidade sobre o que isso protege:** numa página estática, a tela de acesso é **barreira de
 entrada, não segurança** — o HTML e o JavaScript continuam visíveis em *Ver código-fonte*, e um
 portão do lado do navegador pode ser contornado por quem sabe inspecionar. Ela serve para uso
@@ -131,6 +137,8 @@ Como não há servidor intermediário, a varredura das lojas depende de proxies 
 | `Não consegui falar com a API do Google` (`GEMINI_OFFLINE`) | O **servidor** sem acesso a `generativelanguage.googleapis.com` (firewall, proxy, rede isolada). |
 | `Nenhum modelo de IA disponível para esta chave` | `GEMINI_MODEL` aponta para um modelo inexistente — deixe vazio para usar os padrões. |
 | `Não consegui confirmar nenhuma oferta agora` | As lojas limitaram o acesso momentaneamente; tente de novo em alguns segundos. |
+| No celular a tela fica **preta** (nada do portão aparece) | O script principal não rodou: WebView interno do WhatsApp/Instagram bloqueia `localStorage`, o modo privado lança erro, ou o navegador é antigo demais para `type="module"`. Desde já o site cai para um depósito em memória e mostra o cartão de acesso com o motivo (`#gateDead`) em vez de tela preta — mas para o acesso *sobreviver* ao fechar, abra no Chrome/Safari normais. |
+| No iPhone o formulário dá zoom e sai da tela ao tocar no campo | Combate-se com `font-size:16px` em telas ≤ 640px (iOS só não dá zoom a partir de 16px) — já aplicado no CSS do portão; se aparecer zoom em outro campo, é o mesmo remédio. |
 | PDF digitalizado não segmenta | O arquivo é imagem; rode OCR antes (a versão estática também precisa de texto extraível). |
 | A tela de acesso não sai do lugar / nada aparece | Sessão expirada ou `AUTH_SECRET` ausente no Worker: o `/verify` devolve 401 e o site volta a bloquear. Crie o secret (ou limpe ⚙ → **Servidor** para usar o modo local) e recarregue. |
 | “Muitas tentativas. Aguarde 30 s.” | Cooldown anti-força-bruta: 5 falhas seguidas no mesmo navegador. Espere os 30 s. |
