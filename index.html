@@ -18,6 +18,11 @@ body{ background:var(--ink); color:#e8f0ed; font-family:Inter,system-ui,sans-ser
 ::selection{ background:var(--volt); color:var(--ink); }
 .bg-grid{ background-image:linear-gradient(to right,rgba(148,210,189,.045) 1px,transparent 1px),linear-gradient(to bottom,rgba(148,210,189,.045) 1px,transparent 1px); background-size:56px 56px; }
 .glass{ background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); border:1px solid rgba(255,255,255,.07); }
+/* o vidro do modal deixava o texto da página ATRAVÉS dele (inlegível, parecia campo sobreposto):
+   aqui o cartão ganha fundo opaco e passa a rolar sozinho quando a janela é baixa */
+.modal-card{ background:rgba(8,12,14,.985); box-shadow:0 24px 70px -20px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+  max-height:min(90vh,860px); overflow-y:auto; overscroll-behavior:contain; }
+@media (max-width:640px){ .modal-card{ max-height:88dvh; } }
 .text-outline{ color:transparent; -webkit-text-stroke:1.5px rgba(191,247,71,.28); }
 .shine{ background:linear-gradient(100deg,#f2fff9 20%,#bff747 45%,#57ffc7 60%,#f2fff9 80%); background-size:220% auto; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 7s linear infinite; }
 @keyframes shine{ to{ background-position:220% center; } }
@@ -209,8 +214,8 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
 </footer>
 
 <!-- ============ MODAL DA CHAVE ============ -->
-<div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-  <div class="glass w-full max-w-md rounded-3xl p-6">
+<div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+  <div class="glass modal-card w-full max-w-md rounded-3xl p-6">
     <h3 class="font-display text-lg font-bold text-white">Acesso, chave da IA e varredura das lojas</h3>
     <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Você já entrou com e-mail e senha. Falta só dizer de onde vem a IA: este site <strong class="text-white">não traz chave embutida</strong> (o GitHub bloqueia chave de API no código público), então escolha uma das rotas. Tudo aqui fica salvo <em>no seu navegador</em> — nada é enviado para um servidor nosso.</p>
     <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-white/75">
@@ -388,6 +393,13 @@ const store = {
   set server(v) { const x = (v || "").trim(); try { x ? LS.setItem("licita_server_url", x) : LS.removeItem("licita_server_url"); } catch { } },
 };
 const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+/* atalho: Esc fecha o modal ⚙ (útil quando ele abre sozinho no boot) */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const m = $("#keyModal");
+  if (m && !m.classList.contains("hidden")) { m.classList.add("hidden"); m.classList.remove("flex"); }
+});
+
 function refreshStatus() {
   const aiOk = AUTH.serverMode || Boolean(store.key);
   $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (aiOk ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
@@ -420,7 +432,8 @@ $("#copyLinkBtn").onclick = async () => {
 };
 $("#btnKey").onclick = () => { $("#keyInput").value = safeGet("licita_gemini_key") || ""; $("#serverInput").value = store.server; $("#proxyInput").value = store.proxy;
   $("#storageWarn").classList.toggle("hidden", !STORAGE_BLOCKED);
-  $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
+  $("#keyModal").classList.remove("hidden");
+  setTimeout(() => $("#keyInput").focus(), 60); $("#keyModal").classList.add("flex"); };
 $("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
 $("#saveKeyBtn").onclick = () => {
   const v = $("#keyInput").value.trim();
@@ -1332,7 +1345,12 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); runSearch(); }
 });
 $("#editalInput").oninput = (e) => { $("#charCount").textContent = `${e.target.value.length}/8000`; };
-function showKeyModal() { $("#keyInput").value = safeGet("licita_gemini_key") || ""; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
+function showKeyModal() {
+  $("#keyInput").value = safeGet("licita_gemini_key") || "";
+  $("#storageWarn").classList.toggle("hidden", !STORAGE_BLOCKED);
+  $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex");
+  setTimeout(() => $("#keyInput").focus(), 60);
+}
 
 /* ------------------ histórico (localStorage) ------------------ */
 const HKEY = "licita_historico_v1";
