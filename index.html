@@ -418,6 +418,16 @@ $("#saveKeyBtn").onclick = () => {
  *    (quem usa o próprio DevTools contorna). Sem WebCrypto (contexto inseguro), usa um resumo
  *    mais fraco e avisa na tela.
  */
+/* O $ deste arquivo é querySelector (exige '#'). O portão de acesso usa gEl(id), que é o
+   getElementById direto: sem convenção de seletor para errar. E gBind avisa no console em vez de
+   derrubar o script inteiro se um id faltar — era isso que deixava a tela de login inerte. */
+const gEl = (id) => document.getElementById(id);
+const gBind = (id, prop, fn) => {
+  const el = gEl(id);
+  if (el) el[prop] = fn;
+  else console.warn("[acesso] elemento ausente no HTML: #" + id);
+};
+
 const AUTH = (() => {
   const UKEY = "licita_users", SKEY = "licita_session", TKEY = "licita_throttle";
   const KEEP_DAYS = 14, MAX_FAILS = 5, COOLDOWN_MS = 30_000;
@@ -547,7 +557,7 @@ const AUTH = (() => {
 /* ------------------ tela de acesso: pintura e eventos ------------------ */
 let gateMode = "login";
 function gateError(msg) {
-  const el = $("gateMsg");
+  const el = gEl("gateMsg");
   if (!msg) { el.classList.add("hidden"); return; }
   el.textContent = msg;
   el.classList.remove("hidden");
@@ -557,54 +567,58 @@ function gateError(msg) {
   card?.classList.add("shake");
 }
 function paintGate() {
+  if (!gEl("gateSubmit")) return;
   const firstRun = AUTH.mode === "local" && AUTH.enrolled === 0;
   gateMode = firstRun ? "create" : gateMode;
   const creating = gateMode === "create";
-  $("gateSubtitle").textContent = creating
+  gEl("gateSubtitle").textContent = creating
     ? "primeiro uso: defina o e-mail e a senha deste acesso"
     : "entre com e-mail e senha para consultar";
-  $("gateConfirmWrap").classList.toggle("hidden", !creating);
-  $("gateSubmit").textContent = creating ? "Criar acesso e entrar" : "Entrar";
-  $("gatePass").autocomplete = creating ? "new-password" : "current-password";
-  $("gateToggle").classList.toggle("hidden", creating && AUTH.enrolled === 0);
-  $("gateToggle").textContent = creating ? "já tenho acesso" : "criar novo acesso";
-  $("gateMode").textContent = AUTH.mode === "servidor" ? "verificado no servidor" : "verificação local";
-  $("gateNote").innerHTML = (AUTH.storageBlocked
+  gEl("gateConfirmWrap").classList.toggle("hidden", !creating);
+  gEl("gateSubmit").textContent = creating ? "Criar acesso e entrar" : "Entrar";
+  gEl("gatePass").autocomplete = creating ? "new-password" : "current-password";
+  gEl("gateToggle").classList.remove("hidden");
+  gEl("gateToggle").setAttribute("data-mode", gateMode);
+  // o rótulo descreve a AÇÃO do botão (não o modo atual): foi "criar novo acesso" parado em
+  // modo criar que pareceu botão quebrado
+  gEl("gateToggle").textContent = creating ? "já tenho um acesso, quero entrar" : "criar um novo acesso";
+  gEl("gateMode").textContent = AUTH.mode === "servidor" ? "verificado no servidor" : "verificação local";
+  gEl("gateNote").innerHTML = (AUTH.storageBlocked
     ? "<span class=\"text-rose-300\">Este navegador bloqueou o armazenamento (modo privado ou app interno): o acesso vale só até fechar a página. Abra no Chrome/Safari normal para salvar.</span> "
     : "") + (AUTH.mode === "servidor"
     ? `Login validado pelo seu servidor <span class="font-mono text-white/45">${esc(AUTH.serverBase.replace(/^https:\/\//, ""))}</span> — a chave da IA fica fora do navegador.`
     : (AUTH.weakHash
         ? "Modo local: sem HTTPS/WebCrypto neste contexto, o resumo da senha é mais fraco. Para validação de verdade, configure o servidor em ⚙."
         : "Modo local: os acessos existem só neste navegador (senha guardada como SHA-256 + salt). Contra uso casual — para proteger a cota da IA, use o servidor (pages-proxy/)."));
-  $("gateSubmit").disabled = false;
+  gEl("gateSubmit").disabled = false;
 }
 async function ensureAccess() {
   const s = await AUTH.restore();
   const locked = !s;
   document.documentElement.classList.toggle("locked", locked);
-  $("authGate").classList.toggle("hidden", !locked);
-  $("authGate").classList.toggle("flex", locked);
-  $("btnUser").classList.toggle("hidden", locked);
-  $("btnUser").classList.toggle("flex", !locked);
+  gEl("authGate").classList.toggle("hidden", !locked);
+  gEl("authGate").classList.toggle("flex", locked);
+  gEl("btnUser").classList.toggle("hidden", locked);
+  gEl("btnUser").classList.toggle("flex", !locked);
   if (!locked) {
-    $("userChip").textContent = s.email;
+    gEl("userChip").textContent = s.email;
     document.querySelectorAll(".fade-in").forEach((el) => el.classList.remove("hidden"));
   } else {
-    $("gatePass").value = ""; $("gatePass2").value = "";
+    gEl("gatePass").value = ""; gEl("gatePass2").value = "";
     paintGate();
-    setTimeout(() => $("gateEmail").focus(), 80);
+    setTimeout(() => gEl("gateEmail").focus(), 80);
   }
   return !locked;
 }
-$("gateForm").onsubmit = async (e) => {
+gBind("gateForm", "onsubmit", async (e) => {
   e.preventDefault();
-  const email = $("gateEmail").value, pass = $("gatePass").value, keep = $("gateRemember").checked;
+  const email = gEl("gateEmail").value, pass = gEl("gatePass").value, keep = gEl("gateRemember").checked;
   gateError(null);
-  const btn = $("gateSubmit");
+  const btn = gEl("gateSubmit");
   btn.disabled = true; btn.textContent = "Verificando…";
   try {
     if (gateMode === "create") {
-      if (pass !== $("gatePass2").value) { gateError("As senhas não conferem."); return; }
+      if (pass !== gEl("gatePass2").value) { gateError("As senhas não conferem."); return; }
       const c = await AUTH.createAccess(email, pass);
       if (c.error) { gateError(c.error); return; }
     }
@@ -617,15 +631,28 @@ $("gateForm").onsubmit = async (e) => {
     btn.disabled = false;
     paintGate();
   }
-};
+});
 $("#authGate")?.addEventListener("focusin", (e) => {
   const t = e.target;
   if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
     setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
   }
 });
-$("gateToggle").onclick = () => { gateMode = gateMode === "create" ? "login" : "create"; gateError(null); paintGate(); };
-$("btnLogout").onclick = () => { AUTH.signOut(); location.reload(); };
+gBind("gateToggle", "onclick", () => {
+  const firstRun = AUTH.mode === "local" && AUTH.enrolled === 0;
+  if (firstRun) {
+    // sem cadastro neste navegador não há para onde voltar: explicar em vez de ficar mudo
+    gateError("Ainda não existe acesso cadastrado neste navegador. Crie o primeiro acima "
+      + "(e-mail + senha de 10 caracteres) e entre com ele depois.");
+    gEl("gateEmail")?.focus?.();
+    return;
+  }
+  gateMode = gateMode === "create" ? "login" : "create";
+  gateError(null);
+  paintGate();
+  gEl(gateMode === "create" ? "gatePass2" : "gateSubmit")?.focus?.();
+});
+gBind("btnLogout", "onclick", () => { AUTH.signOut(); location.reload(); });
 
 /* ------------------ chamadas à IA ------------------ */
 async function geminiCall(parts, maxTokens = 8192) {
