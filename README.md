@@ -53,7 +53,37 @@ O `drizzle.config.ts` lê `DATABASE_URL` do `.env.local` automaticamente.
 | `GET /api/searches` · `GET /api/searches/[id]` · `DELETE …` | Histórico (listar, abrir, apagar, esvaziar lixeira). |
 | `GET /api/status` · `GET /api/health` | Diagnóstico: chave configurada, modelo, tipo de armazenamento. |
 
-## Versão estática (GitHub Pages)
+## Versão estática (GitHub Pages) — publicar
+
+O Pages ainda **não está habilitado** neste repositório (e habilitar exige permissão de dono do
+repo — o agente não pode). É um clique:
+
+**Settings → Pages → Build and deployment → Source: `GitHub Actions`**
+
+A partir daí, o workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) publica
+automaticamente a cada push na `main` (e pode ser disparado à mão em *Actions → Pages (versão
+estática) → Run workflow*). Ele sobe **somente** a demo estática — `index.html` (+ a cópia
+`gh-pages-demo.html` e a pasta `pages-proxy/`) — em vez de espelhar a árvore inteira do
+repositório como site.
+
+Depois de publicado, em `https://marcossilva023l20.github.io/assistentedelicitacoes/`:
+
+- **A chave não vai para o repositório.** Ela é colada uma vez no botão **⚙ Chave IA** e fica no
+  `localStorage` do seu dispositivo; as chamadas saem do *seu* navegador direto para o Google.
+- O indicador do topo diz em que estado você está: `configure a chave da IA` →
+  `IA ativa · proxies públicos (instáveis)` → `IA ativa · varredura pelo seu proxy`.
+- **Recomendado:** implante o proxy gratuito de [`pages-proxy/worker.js`](pages-proxy/worker.js)
+  num Cloudflare Worker (2 min, camada grátis) e cole a URL no mesmo modal — sem isso, a leitura
+  dos preços nas páginas das lojas depende dos proxies CORS públicos, que hoje estão com limite de
+  plano, fora do ar ou pedindo chave paga. O app avisa claramente quando o transporte falhou, em
+  vez de dizer que “não achou ofertas”.
+- Alternativa sem workflow: Source = `Deploy from a branch` → `main` / `(root)`. Nesse caso o site
+  serve a árvore toda (qualquer pessoa consegue baixar `src/`), e o `.nojekyll` na raiz já cuida
+  de desligar o pipeline Jekyll.
+
+## Fluxo da análise
+
+## Fluxo da análise
 
 `index.html` é a versão que roda só no navegador, sem servidor: a chave é colada uma vez no
 botão **⚙ Chave IA** e fica no `localStorage` do dispositivo (nunca no repositório).

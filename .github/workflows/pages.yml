@@ -1,0 +1,54 @@
+name: Pages (versão estática)
+
+# Publica SOMENTE a demo estática (index.html) no GitHub Pages — sem expor a árvore
+# do repositório como site. Requer Settings → Pages → Build and deployment →
+# Source = "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "public/gh-pages-demo.html"
+      - ".nojekyll"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Montar _site (página única, sem build)
+        run: |
+          mkdir -p _site
+          cp index.html _site/index.html
+          cp public/gh-pages-demo.html _site/gh-pages-demo.html
+          cp -r pages-proxy _site/pages-proxy
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.out.outputs.page_url }}
+    steps:
+      - id: out
+        uses: actions/deploy-pages@v4
