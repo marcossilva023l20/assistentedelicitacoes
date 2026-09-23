@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Imagem inválida ou vazia." }, { status: 400 });
     }
     if (mime === "image/heic" || mime === "image/heif") {
+      // alguns modelos rejeitam heic — o cliente já converte para jpeg; guarda de segurança
       return NextResponse.json({ error: "Converta a foto para JPG (ex.: exporte ou capture em JPG)." }, { status: 400 });
     }
   } catch {
@@ -48,17 +49,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ search: detail, identified: { title: plan.title, description: plan.description } });
   } catch (err) {
     if (err instanceof MissingKeyError) {
-      return NextResponse.json(
-        {
-          error:
-            "Busca por foto precisa da chave GEMINI_API_KEY (visão). Configure a chave para usar foto; a busca por texto funciona sem chave em modo local.",
-          code: "MISSING_KEY",
-        },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "Chave da IA não configurada.", code: "MISSING_KEY" }, { status: 503 });
     }
     if (err instanceof QuotaError) {
-      return NextResponse.json({ error: err.message, code: "QUOTA" }, { status: 429 });
+      return NextResponse.json(
+        { error: err.message, code: "QUOTA" },
+        { status: 429 }
+      );
     }
     const message = err instanceof Error ? err.message : "Erro inesperado na análise da imagem.";
     return NextResponse.json({ error: message }, { status: 500 });

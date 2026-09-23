@@ -123,30 +123,11 @@ export default function SearchConsole() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    let retries = 0;
-    const maxRetries = 5;
-    const fetchStatus = async () => {
-      try {
-        const r = await fetch("/api/status", { cache: "no-store" });
-        if (!r.ok) throw new Error("status not ok");
-        const d = (await r.json()) as Status & { db?: boolean; mode?: string };
-        if (!cancelled) setStatus(d as Status);
-      } catch {
-        if (retries < maxRetries && !cancelled) {
-          retries++;
-          setTimeout(fetchStatus, 1000 * retries);
-        } else if (!cancelled) {
-          // fallback: modo local funciona mesmo sem IA
-          setStatus({ configured: false, model: "filtro local (sem chave)" });
-        }
-      }
-    };
-    fetchStatus();
+    fetch("/api/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setStatus(d as Status))
+      .catch(() => setStatus({ configured: false, model: "gemini" }));
     refreshHistory();
-    return () => {
-      cancelled = true;
-    };
   }, [refreshHistory]);
 
   const scrollToResults = useCallback(() => {
@@ -397,7 +378,7 @@ export default function SearchConsole() {
             </span>
           </a>
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60">
+            <span className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 sm:flex">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   status == null
@@ -408,24 +389,11 @@ export default function SearchConsole() {
                 }`}
               />
               {status == null
-                ? "conectando… (aguarde 2s)"
+                ? "conectando…"
                 : status.configured
-                  ? `IA ativa · ${status.model} · modo ${ (status as any).mode || "memory" }`
-                  : `modo local · ${status.model} (sem chave)`}
+                  ? `IA gratuita ativa · ${status.model}`
+                  : "configure a chave da IA"}
             </span>
-            <button
-              onClick={() => {
-                setStatus(null);
-                fetch("/api/status", { cache: "no-store" })
-                  .then((r) => r.json())
-                  .then((d) => setStatus(d))
-                  .catch(() => setStatus({ configured: false, model: "filtro local" }));
-              }}
-              className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/50 hover:text-white"
-              title="Recarregar status"
-            >
-              ↻
-            </button>
           </div>
         </div>
       </header>

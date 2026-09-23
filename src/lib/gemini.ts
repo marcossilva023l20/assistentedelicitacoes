@@ -88,12 +88,10 @@ function asStringArray(v: unknown): string[] {
 /* ------------------------------------------------------------------ */
 
 const MODEL_PREFERENCE = [
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash-8b",
-  "gemini-2.0-flash-001",
-  "gemini-1.5-flash-002",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3-flash-preview",
 ];
 
 function getClient(): { ai: GoogleGenAI; models: string[] } | null {
@@ -511,6 +509,7 @@ export async function analyzeEditalItem(
   planOverride?: Plan,
   rawFilters?: Partial<SearchFilterOptions>
 ): Promise<AnalyzedSearch> {
+  if (!getClient()) throw new MissingKeyError();
   const filters = clampFilters(rawFilters);
 
   // filtro rigoroso ⇒ coleta mais ofertas, pois muitas serão descartadas
@@ -533,12 +532,9 @@ export async function analyzeEditalItem(
   const planResult = await planPromise;
 
   let gathered: GatherResult | null = null;
-  // Se a IA entregou um plano melhor (com model), usa as queries dela; senão tenta com o plano final (local ou override)
-  if (!planOverride && planResult.plan.queries.length) {
+  if (!planOverride && planResult.model) {
     try {
-      // prioriza queries da IA quando há modelo, mas também tenta quando é plano local
-      const budget = planResult.model ? 60000 : 45000;
-      gathered = await gatherCandidates(planResult.plan.queries, budget, gatherOpts);
+      gathered = await gatherCandidates(planResult.plan.queries, 60000, gatherOpts);
     } catch {
       gathered = null;
     }

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, isDbConfigured } from "@/db";
+import { db } from "@/db";
 import { trBatches } from "@/db/schema";
 import { extractTextFromFile, segmentTr } from "@/lib/termo";
-import { geminiText } from "@/lib/gemini";
+import { geminiText, MissingKeyError } from "@/lib/gemini";
 import type { TrBatchState } from "@/lib/shared";
-import { memoryStore } from "@/lib/memory-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -47,7 +46,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // Mesmo sem GEMINI_API_KEY, segmentTr tem fallback local
+    const hasKey = Boolean(
+      process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    );
+    if (!hasKey) throw new MissingKeyError();
+
     const seg = await segmentTr(text, geminiText);
     if (seg.items.length === 0) {
       return NextResponse.json(
@@ -57,12 +60,6 @@ export async function POST(req: Request) {
         },
         { status: 422 }
       );
-    }
-
-    if (!isDbConfigured || !db) {
-      const batch = memoryStore.createTrBatch(file.name, seg.items.map((it) => ({ ...it, search: null })));
-      const state: TrBatchState = memoryStore.toTrBatchState(batch);
-      return NextResponse.json({ batch: state, via: seg.via, mode: "memory" });
     }
 
     const [batch] = await db
@@ -79,6 +76,9 @@ export async function POST(req: Request) {
     };
     return NextResponse.json({ batch: state, via: seg.via });
   } catch (err) {
+    if (err instanceof MissingKeyError) {
+      return NextResponse.json({ error: "Chave da IA não configurada.", code: "MISSING_KEY" }, { status: 503 });
+    }
     const message = err instanceof Error ? err.message : "Falha ao processar o arquivo.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
