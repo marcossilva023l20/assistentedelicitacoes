@@ -142,13 +142,13 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
 <div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
   <div class="glass w-full max-w-md rounded-3xl p-6">
     <h3 class="font-display text-lg font-bold text-white">Chave da IA e varredura das lojas</h3>
-    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Esta página roda 100% no seu navegador — a chave fica salva <strong class="text-white">somente no seu dispositivo</strong> (localStorage), nunca em servidor.</p>
+    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Esta página roda 100% no seu navegador e <strong class="text-white">já vem com a chave da IA embutida</strong> — não precisa colar nada para consultar. Deixe os campos abaixo vazios para usar a do site.</p>
     <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-white/75">
-      <li>Acesse <span class="font-mono text-[var(--volt)]">aistudio.google.com</span> e clique em <em>Get API key</em> (conta Google).</li>
+      <li>Quer usar <em>sua</em> chave (recomendado para uso intenso)? Gere em <span class="font-mono text-[var(--volt)]">aistudio.google.com</span> e cole abaixo: fica só no seu dispositivo e tem prioridade sobre a embutida.</li>
       <li>Cole abaixo. A cota gratuita permite centenas de consultas por dia.</li>
       <li><em class="text-white/60">Opcional:</em> como a página é estática, a varredura das lojas passa por um proxy CORS. Os proxies públicos são instáveis — para uso sério, implante o proxy do repositório (<span class="font-mono text-[var(--volt)]">pages-proxy/worker.js</span> num Cloudflare Worker grátis) e cole a URL aqui.</li>
     </ol>
-    <input id="keyInput" type="password" placeholder="Cole sua chave Gemini aqui" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <input id="keyInput" type="password" placeholder="deixe vazio = usar a chave do site" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
     <input id="proxyInput" type="text" placeholder="https://meu-proxy.workers.dev/?url= (opcional)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
     <div class="mt-4 flex gap-2">
       <button id="saveKeyBtn" class="flex-1 rounded-xl bg-[var(--volt)] py-2.5 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.4)]">Salvar</button>
@@ -225,9 +225,24 @@ function parseBRL(raw) {
 }
 
 /* ------------------ configuração (chave Gemini) ------------------ */
+/**
+ * Chave da IA usada pelo site, SEM o visitante precisar colar nada.
+ * O valor NÃO mora aqui: o workflow do Pages injeta o secret GEMINI_API_KEY
+ * (Settings → Secrets and variables → Actions) no HTML publicado — ver
+ * .github/scripts/inject-key.mjs. Deixar a chave literal num repositório público é lido por
+ * qualquer visitante (e o Push Protection do GitHub recusa o commit, com razão).
+ * Para uso local / teste, preencha em ⚙ Chave IA: o localStorage do dispositivo tem prioridade.
+ * ⚠ Ela fica legível no código-fonte público da página — serve para a cota GRATUITA da conta
+ *   Google dona da chave. Se aparecer cobrança no cartão, use uma chave só sua (campo do modal)
+ *   ou a versão Next.js, que lê GEMINI_API_KEY de .env.local (fora do git).
+ *   Para trocar sem rebuild: cole outra chave em ⚙ Chave IA — o localStorage do dispositivo
+ *   passa a ter prioridade sobre esta constante, e deixá-lo vazio volta para a chave do site.
+ */
+const PRESET_GEMINI_KEY = "";
 const store = {
-  get key() { return localStorage.getItem("licita_gemini_key") || ""; },
-  set key(v) { localStorage.setItem("licita_gemini_key", v.trim()); },
+  get key() { return localStorage.getItem("licita_gemini_key") || PRESET_GEMINI_KEY; },
+  /** vazio = volta a usar a chave embutida no site */
+  set key(v) { const x = (v || "").trim(); x ? localStorage.setItem("licita_gemini_key", x) : localStorage.removeItem("licita_gemini_key"); },
   /** proxy CORS próprio; vazio = tenta os proxies públicos (instáveis) */
   get proxy() { return localStorage.getItem("licita_proxy_url") || ""; },
   set proxy(v) { localStorage.setItem("licita_proxy_url", v.trim()); },
@@ -236,18 +251,21 @@ const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash
 function refreshStatus() {
   $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (store.key ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
   $("#statusDot").classList.remove("hidden"); $("#statusDot").classList.add("flex");
-  $("#statusText").textContent = store.key ? "IA gratuita ativa (chave local)" : "configure a chave da IA";
+  const origemChave = !store.key ? null : store.key === PRESET_GEMINI_KEY ? "chave do site" : "sua chave local";
+  $("#statusText").textContent = !origemChave
+    ? "configure a chave da IA"
+    : "IA ativa · " + origemChave + " · " + (store.proxy ? "varredura pelo seu proxy" : "proxies públicos (instáveis)");
 }
-$("#btnKey").onclick = () => { $("#keyInput").value = store.key; $("#proxyInput").value = store.proxy; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
+$("#btnKey").onclick = () => { $("#keyInput").value = localStorage.getItem("licita_gemini_key") || ""; $("#proxyInput").value = store.proxy; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
 $("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
 $("#saveKeyBtn").onclick = () => {
   const v = $("#keyInput").value.trim();
-  if (v.length < 10) { toast("Cole uma chave válida.", false); return; }
+  if (v && v.length < 10) { toast("Cole uma chave válida (ou deixe vazio para usar a do site).", false); return; }
   const px = $("#proxyInput").value.trim();
   if (px && !/^https?:\/\//i.test(px)) { toast("A URL do proxy precisa começar com http(s)://", false); return; }
   store.key = v; store.proxy = px; refreshStatus();
   $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex");
-  toast(px ? "Chave e proxy salvos no seu navegador." : "Chave salva no seu navegador.");
+  toast((v ? "Chave salva no seu navegador." : "Usando a chave embutida no site.") + (px ? " Proxy salvo." : ""));
 };
 
 /* ------------------ chamadas à IA ------------------ */
@@ -263,7 +281,7 @@ async function geminiCall(parts, maxTokens = 8192) {
       if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error("quota/modelo"); continue; }
       if (res.status === 400 || res.status === 401 || res.status === 403) {
         showKeyModal();
-        throw new Error("A chave da IA foi rejeitada pelo Google (inválida, expirada ou sem permissão). Cole uma chave nova no campo acima e clique em Salvar — dá para gerar de graça em aistudio.google.com/apikey.");
+        throw new Error("A chave da IA foi rejeitada pelo Google (revogada ou sem permissão). Se o campo acima está vazio, vale a chave embutida no site: gere outra em aistudio.google.com/apikey, cole aqui e Salve — ou atualize a constante PRESET_GEMINI_KEY e o secret GEMINI_API_KEY do deploy.");
       }
       if (!res.ok) throw new Error(`Falha na IA (HTTP ${res.status}). Se a rede estiver bloqueada, tente novamente.`);
       const data = await res.json();
@@ -861,7 +879,7 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); runSearch(); }
 });
 $("#editalInput").oninput = (e) => { $("#charCount").textContent = `${e.target.value.length}/8000`; };
-function showKeyModal() { $("#keyInput").value = store.key; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
+function showKeyModal() { $("#keyInput").value = localStorage.getItem("licita_gemini_key") || ""; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
 
 /* ------------------ histórico (localStorage) ------------------ */
 const HKEY = "licita_historico_v1";
@@ -1206,6 +1224,18 @@ const EXAMPLES = [
 $("#exampleChips").innerHTML = EXAMPLES.map((e, i) => `<button data-ex="${i}" class="exChip rounded-full border border-white/10 bg-white/[.03] px-3 py-1 text-[11px] text-white/55 transition hover:border-[var(--volt)]/40 hover:text-[var(--volt)]">${e[0]}</button>`).join("");
 document.querySelectorAll(".exChip").forEach(b => b.onclick = () => { $("#editalInput").value = EXAMPLES[Number(b.dataset.ex)][1]; $("#charCount").textContent = `${EXAMPLES[Number(b.dataset.ex)][1].length}/8000`; });
 $("#sitesMarquee").innerHTML = [...SITES, ...SITES].map(s => `<span class="flex items-center gap-6 font-mono text-[11px] uppercase tracking-[.18em] text-white/35">${s}<span class="h-1 w-1 rounded-full bg-[var(--volt)]/50"></span></span>`).join("");
+
+/* aceita a chave por #chave=… — permite favoritar o link e nunca mais digitar nada,
+   sem colocar a chave no código público do repositório (ela vai só para o seu navegador) */
+(function adoptKeyFromHash() {
+  const m = location.hash.match(/[#&]chave=([^&\s]+)/);
+  if (!m) return;
+  const k = decodeURIComponent(m[1]).trim();
+  if (k.length < 10) return;
+  store.key = k;
+  history.replaceState(null, "", location.pathname + location.search);
+  setTimeout(() => toast("Chave salva no seu navegador — não precisa colar de novo."), 400);
+})();
 
 /* boot */
 refreshStatus();

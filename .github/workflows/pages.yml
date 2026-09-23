@@ -30,12 +30,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Montar _site (página única, sem build)
+        env:
+          # Se o secret existir, a chave publicada no Pages vem dele — assim dá para tirar a
+          # constante do repositório sem quebrar o site. Sem secret, vale a do index.html.
+          AI_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p _site
           cp index.html _site/index.html
           cp public/gh-pages-demo.html _site/gh-pages-demo.html
           cp -r pages-proxy _site/pages-proxy
           touch _site/.nojekyll
+          # Sem secret, nada é alterado: vale a chave embutida no index.html do repositório.
+          node .github/scripts/inject-key.mjs _site/index.html
 
       - uses: actions/configure-pages@v5
 

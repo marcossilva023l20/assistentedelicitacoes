@@ -68,8 +68,24 @@ repositório como site.
 
 Depois de publicado, em `https://marcossilva023l20.github.io/assistentedelicitacoes/`:
 
-- **A chave não vai para o repositório.** Ela é colada uma vez no botão **⚙ Chave IA** e fica no
-  `localStorage` do seu dispositivo; as chamadas saem do *seu* navegador direto para o Google.
+- **A chave já vai embutida na página** (`PRESET_GEMINI_KEY`, em `index.html`): quem abre o site
+  não precisa colar nada. Consequência inevitável de hospedar em Pages — **o repositório é público,
+  então a chave é legível por qualquer visitante**, que pode gastar a sua cota grátis (e, se a chave
+  tiver cobrança ligada, o seu cartão). Mitigações, da mais barata à mais robusta:
+  1. Deixe a cota **sem billing** (só AI Studio, sem cartão) — o dano máximo é a cota do dia.
+  2. Restrinja a chave no Google Cloud Console → *APIs & Services → Credentials → API keys* →
+     *Application restrictions → HTTP referrers*, liberando `https://*.github.io` e
+     `http://localhost:*`. Bloqueia uso casual por terceiros (não é uma barreira absoluta:
+     `Referer` é fácil de forjar para quem não é navegador).
+  3. **Tire a chave do HTML e use o secret do Actions**: crie
+     `Settings → Secrets and variables → Actions → New repository secret` chamado `GEMINI_API_KEY`
+     e apague o valor da constante no `index.html` (deixe `const PRESET_GEMINI_KEY = "";`).
+     O workflow injeta o secret no artefato publicado (`.github/scripts/inject-key.mjs`) e o site
+     continua funcionando — mas aí a versão aberta direto do disco (`file://`) pede a chave no modal.
+  4. Rode a versão Next.js num servidor: a chave fica em `.env.local`/variável de ambiente e nunca
+     aparece no bundle do navegador (é a única opção em que o visitante não consegue ler a chave).
+- O visitante ainda pode colar a **própria** chave em **⚙ Chave IA** (fica no `localStorage` do
+  dispositivo e tem prioridade sobre a embutida); deixar o campo vazio volta para a chave do site.
 - O indicador do topo diz em que estado você está: `configure a chave da IA` →
   `IA ativa · proxies públicos (instáveis)` → `IA ativa · varredura pelo seu proxy`.
 - **Recomendado:** implante o proxy gratuito de [`pages-proxy/worker.js`](pages-proxy/worker.js)
