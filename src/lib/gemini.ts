@@ -55,6 +55,28 @@ export class QuotaError extends Error {
   }
 }
 
+/** A chave existe, mas o Google a rejeitou (revogada, sem acesso ao modelo, projeto sem billing). */
+export class InvalidKeyError extends Error {
+  constructor() {
+    super(
+      "A chave da IA foi rejeitada pelo Google — está inválida, revogada ou sem permissão para este modelo. " +
+        "Gere uma nova em https://aistudio.google.com/apikey e atualize GEMINI_API_KEY (arquivo .env.local, ou a variável de ambiente no seu provedor). Depois reinicie o servidor."
+    );
+    this.name = "InvalidKeyError";
+  }
+}
+
+/** Rede/Google indisponível — distinção importante para não culpar a chave. */
+export class GeminiUnreachableError extends Error {
+  constructor() {
+    super(
+      "Não consegui falar com a API do Google (sem internet no servidor, firewall ou DNS). " +
+        "A pesquisa de lojas continua funcionando, mas a avaliação de conformidade pela IA precisa de acesso a generativelanguage.googleapis.com."
+    );
+    this.name = "GeminiUnreachableError";
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Utilidades de parsing tolerante                                     */
 /* ------------------------------------------------------------------ */
@@ -118,22 +140,104 @@ function isRetryable(err: unknown): boolean {
   );
 }
 
-export async function geminiText(prompt: string, maxTokens: number): Promise<{ text: string; model: string } | null> {
+function isModelNotFound(err: unknown): boolean {
+  const msg = String((err as { message?: string })?.message ?? err ?? "").toLowerCase();
+  const status = (err as { status?: number })?.status ?? (err as { code?: number })?.code;
+  return status === 404 || msg.includes("not_found") || msg.includes("no longer available");
+}
+
+/** Erros de chave inválida/sem permissão — não adianta trocar de modelo nem tentar de novo. */
+function isKeyRejected(err: unknown): boolean {
+  const msg = String((err as { message?: string })?.message ?? err ?? "").toLowerCase();
+  const status = (err as { status?: number })?.status ?? (err as { code?: number })?.code;
+  return (
+    status === 401 ||
+    status === 403 ||
+    msg.includes("api key not valid") ||
+    msg.includes("api_key_invalid") ||
+    msg.includes("permission_denied") ||
+    msg.includes("request had invalid authentication credentials")
+  );
+}
+
+/** Falha de rede (fetch não concluiu) em vez de recusa da API. */
+function isNetworkFailure(err: unknown): boolean {
+  const msg = String((err as { message?: string })?.message ?? err ?? "").toLowerCase();
+  const cause = String((err as { cause?: { message?: string } })?.cause?.message ?? "").toLowerCase();
+  const all = `${msg} ${cause}`;
+  return (
+    all.includes("fetch failed") ||
+    all.includes("network") ||
+    all.includes("enotfound") ||
+    all.includes("econnreset") ||
+    all.includes("econnrefused") ||
+    all.includes("etimedout") ||
+    all.includes("socket hang up") ||
+    all.includes("timed out")
+  );
+}
+
+interface GeminiCall {
+  contents: unknown[];
+  temperature: number;
+  maxOutputTokens: number;
+}
+
+/**
+ * Chama o Gemini no primeiro modelo que responder, percorrendo `MODEL_PREFERENCE`
+ * (e `GEMINI_MODEL`, se definido). Traduz falhas conhecidas em mensagens
+ * acionáveis em vez de estourar um erro cru da SDK para a interface.
+ */
+async function callGemini(call: GeminiCall): Promise<{ text: string; model: string } | null> {
   const client = getClient();
   if (!client) return null;
+
+  let allModelMissing = true;
+  let lastError: unknown = null;
   for (const model of client.models) {
     try {
       const res = await client.ai.models.generateContent({
         model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: { temperature: 0.2, maxOutputTokens: maxTokens },
+        contents: call.contents as Parameters<GoogleGenAI["models"]["generateContent"]>[0]["contents"],
+        config: { temperature: call.temperature, maxOutputTokens: call.maxOutputTokens },
       });
       const text = res.text ?? "";
       if (text.trim()) return { text, model };
+      allModelMissing = false;
     } catch (err) {
+      lastError = err;
+      if (isKeyRejected(err)) throw new InvalidKeyError();
+      if (isNetworkFailure(err)) throw new GeminiUnreachableError();
+      if (!isModelNotFound(err)) allModelMissing = false;
       if (!isRetryable(err)) throw err;
     }
   }
+
+  // nenhum modelo da lista existe para esta chave → erro claro, sem cair mudo no modo local
+  if (allModelMissing && lastError) {
+    throw new Error(
+      `Nenhum modelo de IA disponível para esta chave (${client.models.join(", ")}). ` +
+        "Confira GEMINI_MODEL no .env.local ou deixe o campo vazio para usar os padrões."
+    );
+  }
+  return null;
+}
+
+export async function geminiText(prompt: string, maxTokens: number): Promise<{ text: string; model: string } | null> {
+  return callGemini({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    temperature: 0.2,
+    maxOutputTokens: maxTokens,
+  });
+}
+
+
+/**
+ * Erros de configuração da IA (chave inválida, sem rede) não devem ser engolidos
+ * pelo fallback local — senão o usuário recebe resultados degradados sem saber por quê.
+ */
+function rethrowConfigError(err: unknown): null {
+  if (err instanceof InvalidKeyError || err instanceof GeminiUnreachableError) throw err;
   return null;
 }
 
@@ -213,7 +317,7 @@ ITEM DO EDITAL:
 ${editalText.trim().slice(0, 4000)}
 """`;
 
-  const result = await geminiText(prompt, 4096).catch(() => null);
+  const result = await geminiText(prompt, 4096).catch(rethrowConfigError);
   if (result) {
     const parsed = parseJsonLoose<{ titulo?: unknown; requisitos?: unknown; consultas?: unknown }>(result.text);
     const requirements = asStringArray(parsed?.requisitos);
@@ -321,7 +425,7 @@ Responda SOMENTE com um bloco \`\`\`json\`\`\` (sem texto fora dele):
 }
 Inclua TODOS os ids avaliados, ordenados do melhor candidato ao pior.`;
 
-  const result = await geminiText(prompt, 8192).catch(() => null);
+  const result = await geminiText(prompt, 8192).catch(rethrowConfigError);
   if (!result) return { verdicts: [], model: null };
 
   const parsed = parseJsonLoose<{ avaliacoes?: unknown }>(result.text);
@@ -402,38 +506,16 @@ async function geminiImage(
   mimeType: string,
   maxTokens: number
 ): Promise<{ text: string; model: string } | null> {
-  const client = getClient();
-  if (!client) return null;
-  for (const model of client.models) {
-    try {
-      const res = await client.ai.models.generateContent({
-        model,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }, { inlineData: { data: dataB64, mimeType } }],
-          },
-        ],
-        config: { temperature: 0.15, maxOutputTokens: maxTokens },
-      });
-      const text = res.text ?? "";
-      if (text.trim()) return { text, model };
-    } catch (err) {
-      const msg = String((err as { message?: string })?.message ?? err ?? "").toLowerCase();
-      const status = (err as { status?: number })?.status ?? (err as { code?: number })?.code;
-      const retryable =
-        status === 429 ||
-        status === 404 ||
-        status === 503 ||
-        msg.includes("resource_exhausted") ||
-        msg.includes("quota") ||
-        msg.includes("no longer available") ||
-        msg.includes("not_found") ||
-        msg.includes("overloaded");
-      if (!retryable) throw err;
-    }
-  }
-  return null;
+  return callGemini({
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }, { inlineData: { data: dataB64, mimeType } }],
+      },
+    ],
+    temperature: 0.15,
+    maxOutputTokens: maxTokens,
+  });
 }
 
 export interface ImageProductPlan extends Plan {
@@ -460,7 +542,7 @@ Regras:
 - "consultas": exatamente 6 termos como um comprador digitaria (4 a 8 palavras), sem aspas; 2 genéricas com a palavra "preço", as demais combinadas com lojas brasileiras (mercado livre, amazon, magazine luiza, kabum, shopee, carrefour).
 - Se não for claramente um produto de varejo, descreva o objeto mais próximo de um produto comprável.`;
 
-  const result = await geminiImage(prompt, buffer.toString("base64"), mimeType, 4096).catch(() => null);
+  const result = await geminiImage(prompt, buffer.toString("base64"), mimeType, 4096).catch(rethrowConfigError);
   if (!result) throw new QuotaError("A cota gratuita da IA esgotou agora — tente de novo em alguns minutos.");
 
   const parsed = parseJsonLoose<{

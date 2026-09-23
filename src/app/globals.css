@@ -31,6 +31,14 @@
   }
 }
 
+/* Famílias carregadas pelo <link> do Google Fonts em layout.tsx.
+   Se a CDN estiver indisponível, os fallbacks de sistema assumem. */
+:root {
+  --font-inter: "Inter";
+  --font-sora: "Sora";
+  --font-jbmono: "JetBrains Mono";
+}
+
 html {
   scroll-behavior: smooth;
 }

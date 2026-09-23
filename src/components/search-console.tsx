@@ -59,6 +59,8 @@ interface Status {
   configured: boolean;
   model: string;
   mercadoLivreApi?: boolean;
+  /** onde o histórico é gravado: banco (Postgres) ou arquivo local do servidor */
+  storage?: "postgres" | "local";
 }
 
 /** Reduz a foto antes de enviar (menos bytes, mais velocidade). */
@@ -123,12 +125,30 @@ export default function SearchConsole() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/status")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setStatus(d as Status))
-      .catch(() => setStatus({ configured: false, model: "gemini" }));
-    refreshHistory();
-  }, [refreshHistory]);
+    let alive = true;
+    // Tudo dentro de .then(): nenhum setState síncrono no corpo do effect
+    // (isso causaria um segundo render em cascata logo no mount).
+    void Promise.all([
+      fetch("/api/status", { cache: "no-store" })
+        .then(async (r) => (r.ok ? ((await r.json()) as Status) : null))
+        .catch(() => ({ configured: false, model: "gemini" }) as Status),
+      fetch("/api/searches", { cache: "no-store" })
+        .then(async (r) => (r.ok ? ((await r.json()) as { searches: SearchSummary[] }) : null))
+        .catch(() => null),
+    ])
+      .then(([status, hist]) => {
+        if (!alive) return;
+        if (status) setStatus(status);
+        if (hist?.searches) setHistory(hist.searches);
+        setHistoryLoading(false);
+      })
+      .catch(() => {
+        if (alive) setHistoryLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const scrollToResults = useCallback(() => {
     requestAnimationFrame(() =>
@@ -391,7 +411,7 @@ export default function SearchConsole() {
               {status == null
                 ? "conectando…"
                 : status.configured
-                  ? `IA gratuita ativa · ${status.model}`
+                  ? `IA ativa · ${status.model} · ${status.storage === "postgres" ? "histórico no banco" : "histórico local"}`
                   : "configure a chave da IA"}
             </span>
           </div>

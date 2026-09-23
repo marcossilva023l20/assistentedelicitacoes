@@ -227,7 +227,7 @@ const store = {
   get key() { return localStorage.getItem("licita_gemini_key") || ""; },
   set key(v) { localStorage.setItem("licita_gemini_key", v.trim()); },
 };
-const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
 function refreshStatus() {
   $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (store.key ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
   $("#statusDot").classList.remove("hidden"); $("#statusDot").classList.add("flex");
@@ -253,7 +253,11 @@ async function geminiCall(parts, maxTokens = 8192) {
         body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0.15, maxOutputTokens: maxTokens } })
       });
       if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error("quota/modelo"); continue; }
-      if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
+        showKeyModal();
+        throw new Error("A chave da IA foi rejeitada pelo Google (inválida, expirada ou sem permissão). Cole uma chave nova no campo acima e clique em Salvar — dá para gerar de graça em aistudio.google.com/apikey.");
+      }
+      if (!res.ok) throw new Error(`Falha na IA (HTTP ${res.status}). Se a rede estiver bloqueada, tente novamente.`);
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
       if (text) return { text, model };

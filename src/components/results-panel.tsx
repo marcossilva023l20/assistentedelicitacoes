@@ -590,7 +590,7 @@ function ResultsState({
         <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-300/70">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {partials} opção(ões) na lista não cumprem 100% dos requisitos — você pode ajustar o filtro
-          acima para "100% (Integral)" para ver apenas as estritamente conformes.
+          acima para &quot;100% (Integral)&quot; para ver apenas as estritamente conformes.
         </p>
       )}
 
