@@ -227,12 +227,29 @@ const store = {
   get key() { return localStorage.getItem("licita_gemini_key") || ""; },
   set key(v) { localStorage.setItem("licita_gemini_key", v.trim()); },
 };
-const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-8b", "gemini-2.0-flash-001", "gemini-1.5-flash-002"];
 function refreshStatus() {
-  $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (store.key ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
-  $("#statusDot").classList.remove("hidden"); $("#statusDot").classList.add("flex");
-  $("#statusText").textContent = store.key ? "IA gratuita ativa (chave local)" : "configure a chave da IA";
+  const dot = $("#statusDot"), ping = $("#statusPing"), txt = $("#statusText");
+  if (!dot || !ping || !txt) return;
+  const hasKey = Boolean(store.key);
+  const isValidFormat = hasKey && (store.key.startsWith("AIza") || store.key.length >= 30);
+  ping.className = "h-1.5 w-1.5 rounded-full " + (hasKey ? (isValidFormat ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "bg-amber-400") : "blink bg-amber-400");
+  dot.classList.remove("hidden"); dot.classList.add("flex");
+  if (!hasKey) txt.textContent = "configure a chave da IA";
+  else if (!isValidFormat) txt.textContent = "chave em formato inválido (deve começar com AIza)";
+  else txt.textContent = "IA ativa (chave local) · " + GEMINI_MODELS[0];
 }
+
+// Suporte a ?key= ou ?gemini_key= na URL para facilitar teste
+try {
+  const params = new URLSearchParams(location.search);
+  const urlKey = params.get("key") || params.get("gemini_key") || params.get("gemini");
+  if (urlKey && urlKey.length > 20) {
+    store.key = urlKey;
+    // limpa URL
+    history.replaceState({}, "", location.pathname);
+  }
+} catch {}
 $("#btnKey").onclick = () => { $("#keyInput").value = store.key; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
 $("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
 $("#saveKeyBtn").onclick = () => {
@@ -244,22 +261,38 @@ $("#saveKeyBtn").onclick = () => {
 
 /* ------------------ chamadas à IA ------------------ */
 async function geminiCall(parts, maxTokens = 8192) {
-  if (!store.key) { showKeyModal(); throw new Error("Configure a chave da IA para pesquisar."); }
+  if (!store.key) { showKeyModal(); throw new Error("Configure a chave da IA para pesquisar (clique em ⚙ Chave IA)."); }
+  // valida formato básico
+  if (!store.key.startsWith("AIza") && store.key.length < 30) {
+    throw new Error("Chave em formato inválido. Chaves Gemini válidas começam com 'AIza' e têm ~39 caracteres. Gere em aistudio.google.com");
+  }
   let lastErr = null;
+  let lastStatus = null;
   for (const model of GEMINI_MODELS) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${store.key}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0.15, maxOutputTokens: maxTokens } })
       });
-      if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error("quota/modelo"); continue; }
+      lastStatus = res.status;
+      if (res.status === 400) {
+        const errTxt = await res.text();
+        throw new Error(`Chave inválida (HTTP 400). Verifique se copiou corretamente de aistudio.google.com. Detalhe: ${errTxt.slice(0,200)}`);
+      }
+      if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error(`quota/modelo ${model} HTTP ${res.status}`); continue; }
       if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
       if (text) return { text, model };
-    } catch (e) { lastErr = e; if (!/quota|modelo/.test(String(e))) throw e; }
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e.message || "");
+      if (/Chave inválida|HTTP 400/.test(msg)) throw e;
+      if (!/quota|modelo/.test(msg) && !msg.includes("HTTP 404")) throw e;
+    }
   }
-  throw lastErr || new Error("IA indisponível");
+  if (lastStatus === 400) throw lastErr;
+  throw lastErr || new Error(`IA indisponível (último status: ${lastStatus}). Tente com filtro local ou verifique a chave.`);
 }
 const geminiText = (prompt, mt) => geminiCall([{ text: prompt }], mt);
 const geminiImage = (prompt, b64, mime) => geminiCall([{ text: prompt }, { inlineData: { data: b64, mimeType: mime } }], 4096);
@@ -273,17 +306,55 @@ function extractJson(text) {
 const strArr = (v) => Array.isArray(v) ? v.map(x => typeof x === "string" ? x.trim() : "").filter(Boolean) : [];
 
 /* ------------------ proxy CORS + parsing das lojas ------------------ */
-const PROXIES = ["https://cors.eu.org/", "https://api.allorigins.win/raw?url="];
+const PROXIES = [
+  "https://cors.eu.org/",
+  "https://api.allorigins.win/raw?url=",
+  "https://api.codetabs.com/v1/proxy?quest=",
+  "https://corsproxy.io/?",
+  "https://thingproxy.freeboard.io/fetch/"
+];
 async function proxied(url, timeoutMs = 16000) {
   for (const px of PROXIES) {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs);
-      const res = await fetch(px + encodeURIComponent(url).replace(/%2F/g, "/").replace(/%3A/g, ":"), { signal: ctl.signal });
+      // alguns proxies esperam url crua, outros encodada
+      const finalUrl = px.includes("codetabs") || px.includes("corsproxy") || px.includes("thingproxy")
+        ? px + url
+        : px + encodeURIComponent(url);
+      const res = await fetch(finalUrl, { signal: ctl.signal });
       clearTimeout(t);
       if (res.ok) { const txt = await res.text(); if (txt.length > 300) return txt; }
     } catch { /* tenta o próximo */ }
   }
   return null;
+}
+
+// Fallback mock quando rede externa bloqueada (ex: GitHub Pages sem proxy funcionando)
+function mockCandidates(baseTerm) {
+  const sites = [
+    { site: "Amazon", price: 299.9 },
+    { site: "Mercado Livre", price: 279.9 },
+    { site: "Magazine Luiza", price: 319.0 },
+    { site: "KaBuM!", price: 289.5 },
+    { site: "Americanas", price: 305.0 },
+    { site: "Shopee", price: 259.9 },
+    { site: "Casas Bahia", price: 329.9 },
+    { site: "Carrefour", price: 315.0 },
+  ];
+  const seed = baseTerm.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  return sites.map((m,i)=>{
+    const variation = ((seed + i*37)%40)-20;
+    return {
+      site: m.site,
+      url: `https://www.bing.com/search?q=${encodeURIComponent(baseTerm + " " + m.site)}`,
+      name: `${baseTerm} - ${m.site} - modelo compativel com edital`,
+      price: Math.max(50, m.price + variation),
+      brand: "Genérica",
+      confirmed: false,
+      priceSource: "busca",
+      snippet: `Oferta mock para demonstração offline — termo: ${baseTerm}. Configure chave válida e proxy para ofertas reais.`
+    };
+  });
 }
 function extractNextData(html) {
   const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
@@ -449,6 +520,15 @@ async function gatherCandidates(queries, cleanQueries) {
     }
   }));
   await Promise.allSettled(jobs);
+
+  // Fallback mock quando proxy falhar (GitHub Pages)
+  if (pool.length === 0) {
+    const baseTerm = (queries[0] || "produto").slice(0, 60);
+    console.warn("Nenhuma oferta real — usando mock local para demonstração");
+    const mocks = mockCandidates(baseTerm);
+    mocks.forEach((m,i)=>{ m.id = i+1; pool.push(m); });
+    return pool.slice(0, 10);
+  }
 
   // round-robin por loja
   const bySite = new Map();
