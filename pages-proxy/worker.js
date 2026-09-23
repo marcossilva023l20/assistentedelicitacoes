@@ -64,7 +64,7 @@ function json(status, error) {
 function isPrivateHost(hostname) {
   const h = hostname.toLowerCase();
   if (h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return true;
-  if (/^(127\.|10\.|0\.)/.test(h)) return true;
+  if (/^(127\.|10\.|0\.|169\.254\.)/.test(h)) return true;
   if (/^192\.168\./.test(h)) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
   if (h.startsWith("[")) return true; // IPv6 literal
