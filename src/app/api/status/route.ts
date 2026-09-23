@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isDbConfigured } from "@/db";
 
 export const runtime = "nodejs";
 
@@ -16,7 +17,9 @@ export async function GET() {
   return NextResponse.json({
     configured,
     keySource,
-    model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
+    model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
     mercadoLivreApi: Boolean(process.env.MERCADO_LIVRE_CLIENT_ID && process.env.MERCADO_LIVRE_CLIENT_SECRET),
+    db: isDbConfigured,
+    mode: isDbConfigured ? "postgres" : "memory",
   });
 }
