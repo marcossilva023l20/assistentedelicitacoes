@@ -81,7 +81,7 @@ function allowedHost(hostname, env) {
   return list.some((suffix) => h === suffix || h.endsWith(`.${suffix}`) || h.endsWith(suffix));
 }
 
-export default {
+const worker = {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
     if (request.method !== "GET" && request.method !== "HEAD") return json(405, "use GET");
@@ -139,3 +139,5 @@ export default {
     }
   },
 };
+
+export default worker;
