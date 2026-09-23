@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LicitaPreço — Do edital ao menor preço</title>
+<meta name="description" content="Cole o item do edital e receba as melhores ofertas do varejo brasileiro que atendem o edital, ordenadas pelo menor preço, com links reais. Versão estática (GitHub Pages)." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root{ --ink:#05080a; --volt:#bff747; --mist:#9fb3ad; }
+*{ scrollbar-width:thin; scrollbar-color:#1c2629 #070b0d; }
+body{ background:var(--ink); color:#e8f0ed; font-family:Inter,system-ui,sans-serif; overflow-x:hidden; }
+.font-display{ font-family:Sora,Inter,sans-serif; } .font-mono{ font-family:"JetBrains Mono",monospace; }
+::selection{ background:var(--volt); color:var(--ink); }
+.bg-grid{ background-image:linear-gradient(to right,rgba(148,210,189,.045) 1px,transparent 1px),linear-gradient(to bottom,rgba(148,210,189,.045) 1px,transparent 1px); background-size:56px 56px; }
+.glass{ background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); border:1px solid rgba(255,255,255,.07); }
+.text-outline{ color:transparent; -webkit-text-stroke:1.5px rgba(191,247,71,.28); }
+.shine{ background:linear-gradient(100deg,#f2fff9 20%,#bff747 45%,#57ffc7 60%,#f2fff9 80%); background-size:220% auto; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 7s linear infinite; }
+@keyframes shine{ to{ background-position:220% center; } }
+@keyframes blink{ 0%,100%{opacity:1} 50%{opacity:.25} } .blink{ animation:blink 1.6s ease-in-out infinite; }
+@keyframes marquee{ from{transform:translateX(0)} to{transform:translateX(-50%)} } .marquee{ animation:marquee 32s linear infinite; }
+.mask-fade-x{ mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent); }
+.corner{ position:relative; }
+.corner::before,.corner::after{ content:""; position:absolute; width:14px; height:14px; border-color:rgba(191,247,71,.55); border-style:solid; }
+.corner::before{ top:-1px; left:-1px; border-width:1.5px 0 0 1.5px; } .corner::after{ bottom:-1px; right:-1px; border-width:0 1.5px 1.5px 0; }
+.line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+input[type=range]{ accent-color:var(--volt); }
+.fade-in{ animation:fadeIn .35s ease both; } @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+.toast{ animation:fadeIn .25s ease both; }
+progress::-webkit-progress-bar{ background:rgba(255,255,255,.08); border-radius:99px; }
+progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
+</style>
+</head>
+<body class="antialiased">
+
+<!-- ============ HEADER ============ -->
+<header class="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-[#05080a]/80 backdrop-blur-xl">
+  <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+    <a href="#" class="flex items-center gap-3">
+      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--volt)] text-[#05080a] shadow-[0_0_24px_rgba(191,247,71,.35)] font-display font-extrabold">LP</span>
+      <span class="font-display text-lg font-bold tracking-tight text-white">Licita<span class="text-[var(--volt)]">Preço</span>
+        <span class="ml-2 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] uppercase text-white/50">estática · GitHub Pages</span>
+      </span>
+    </a>
+    <div class="flex items-center gap-2">
+      <span id="statusDot" class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 sm:flex">
+        <span id="statusPing" class="h-1.5 w-1.5 rounded-full blink bg-white/40"></span>
+        <span id="statusText">conectando…</span>
+      </span>
+      <button id="btnKey" class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/70 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]" title="Configurar chave da IA (Gemini)">⚙ Chave IA</button>
+    </div>
+  </div>
+</header>
+
+<main class="relative mx-auto max-w-7xl px-4 pb-24 sm:px-6">
+  <div aria-hidden class="pointer-events-none absolute inset-0 -z-10">
+    <div class="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_75%_60%_at_50%_0%,black,transparent)]"></div>
+    <div class="absolute -top-32 left-1/2 h-80 w-[44rem] -translate-x-1/2 rounded-full bg-[var(--volt)]/[.07] blur-[120px]"></div>
+  </div>
+
+  <!-- ============ HERO ============ -->
+  <section class="pb-10 pt-28 sm:pt-32">
+    <p class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[.3em] text-[var(--volt)]/80">✦ Pesquisa de preços para licitações · IA + busca real</p>
+    <h1 class="mt-5 max-w-3xl font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">Do edital ao <span class="shine">menor preço</span>. Em minutos.</h1>
+    <p class="mt-5 max-w-xl text-base leading-relaxed text-[var(--mist)]">Cole o item do edital. A IA identifica os requisitos, varre os marketplaces do Brasil e devolve ofertas que atendem 100% das especificações — ordenadas da mais barata à mais cara, com link direto e média de preços.</p>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <section class="grid gap-5 lg:grid-cols-[minmax(360px,430px)_1fr]">
+    <!-- painel de entrada -->
+    <div class="lg:sticky lg:top-24 lg:self-start">
+      <div class="corner glass relative rounded-3xl p-5 sm:p-6">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-[11px] uppercase tracking-[.24em] text-[var(--volt)]/80">▤ Item do edital</p>
+          <span id="charCount" class="font-mono text-[11px] text-white/30">0/8000</span>
+        </div>
+        <textarea id="editalInput" spellcheck="false" placeholder="Cole aqui a descrição completa do item com as especificações técnicas.
+
+Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, autonomia mínima 30 min a meia carga, garantia 3 anos…”" class="mt-4 min-h-[260px] w-full resize-y rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-[13px] leading-relaxed text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--volt)]/15"></textarea>
+
+        <div class="mt-3 flex flex-wrap gap-1.5" id="exampleChips"></div>
+
+        <!-- busca por foto -->
+        <input id="imageInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
+        <div id="imageZone" class="mt-3"></div>
+
+        <button id="btnConsult" class="group mt-4 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--volt)] px-5 py-4 font-display text-sm font-bold uppercase tracking-wide text-[#05080a] transition enabled:hover:shadow-[0_0_36px_rgba(191,247,71,.4)] disabled:cursor-not-allowed disabled:opacity-35">
+          <span id="btnConsultLabel">CONSULTAR MENOR PREÇO</span>
+        </button>
+        <p class="mt-2.5 text-center font-mono text-[11px] text-white/30">⌘/Ctrl + Enter para consultar</p>
+      </div>
+
+      <div class="mask-fade-x mt-4 overflow-hidden rounded-2xl border border-white/[.08] bg-white/[.02] py-2.5">
+        <div class="marquee flex w-max gap-6 whitespace-nowrap" id="sitesMarquee"></div>
+      </div>
+    </div>
+
+    <!-- painel de resultados -->
+    <div class="scroll-mt-20" id="resultsWrap">
+      <div class="glass relative min-h-[520px] overflow-hidden rounded-3xl" id="resultsPanel"></div>
+    </div>
+  </section>
+
+  <!-- ============ HISTÓRICO ============ -->
+  <section class="mt-10">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[.28em] text-[var(--volt)]/80">🕘 Histórico</p>
+        <h2 class="mt-2 font-display text-xl font-semibold text-white">Suas cotações recentes</h2>
+      </div>
+      <div id="historyActions" class="flex items-center gap-3"></div>
+    </div>
+    <div class="mt-5" id="historyPanel"></div>
+  </section>
+
+  <!-- ============ TR ============ -->
+  <section class="mt-14" id="trSection">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[.28em] text-[var(--volt)]/80">▦ Termo de referência</p>
+        <h2 class="mt-2 font-display text-xl font-semibold text-white">Importe o TR inteiro — eu separo os itens e pesquiso cada um</h2>
+      </div>
+      <div id="trActions" class="flex gap-2"></div>
+    </div>
+    <input id="trFileInput" type="file" accept=".pdf,.docx,.txt,.md,.csv" class="hidden" />
+    <div class="mt-5" id="trPanel"></div>
+  </section>
+</main>
+
+<footer class="border-t border-white/5 py-8">
+  <div class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 px-4 text-xs text-white/35 sm:flex-row sm:items-center sm:px-6">
+    <p>LicitaPreço (estático) — apoio à pesquisa de preços (Lei nº 14.133/21). Dados das lojas chegam via proxy CORS comunitario (cors.eu.org).</p>
+    <p>Confirme sempre preço, frete e disponibilidade no anúncio antes de formalizar a cotação.</p>
+  </div>
+</footer>
+
+<!-- ============ MODAL DA CHAVE ============ -->
+<div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+  <div class="glass w-full max-w-md rounded-3xl p-6">
+    <h3 class="font-display text-lg font-bold text-white">Chave da IA (Google Gemini — grátis)</h3>
+    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Esta página roda 100% no seu navegador — a chave fica salva <strong class="text-white">somente no seu dispositivo</strong> (localStorage), nunca em servidor.</p>
+    <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-white/75">
+      <li>Acesse <span class="font-mono text-[var(--volt)]">aistudio.google.com</span> e clique em <em>Get API key</em> (conta Google).</li>
+      <li>Cole abaixo. A cota gratuita permite centenas de consultas por dia.</li>
+    </ol>
+    <input id="keyInput" type="password" placeholder="Cole sua chave Gemini aqui" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <div class="mt-4 flex gap-2">
+      <button id="saveKeyBtn" class="flex-1 rounded-xl bg-[var(--volt)] py-2.5 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.4)]">Salvar chave</button>
+      <button id="closeKeyBtn" class="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/70 hover:text-white">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="fixed bottom-5 right-5 z-[90] flex flex-col gap-2"></div>
+<div id="dragOverlay" class="pointer-events-none fixed inset-0 z-[70] hidden items-center justify-center bg-[#05080a]/80 backdrop-blur-sm">
+  <div class="rounded-3xl border-2 border-dashed border-[var(--volt)]/60 bg-[var(--volt)]/[.06] px-12 py-10 text-center">
+    <p class="font-display text-lg font-semibold text-white">Solte a foto do produto aqui</p>
+    <p class="text-sm text-[var(--mist)]">A IA identifica e busca os menores preços</p>
+  </div>
+</div>
+
+<script type="module">
+/* ================================================================
+   LicitaPreço estático — engine 100% no navegador
+   IA: API direta do Gemini (browser) · Lojas: via proxy CORS (cors.eu.org)
+   ================================================================ */
+
+/* ------------------ estado / utilidades ------------------ */
+const $ = (s) => document.querySelector(s);
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const fmtBRL = (v) => (v == null || !Number.isFinite(v) ? "—" : BRL.format(v));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const normTxt = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const USED_RE = /\b(usad[oa]s?|seminov[oa]s?|semi-nov[oa]s?|recondicionad[oa]s?|refurbish(ed)?|remanufaturad[oa]s?|mostru[áa]rio|vitrine|open\s*box|avariad[oa]|com\s*defeito|para\s*peças)\b/i;
+const SITE_COLORS = [
+  [/mercado\s*livre/i, "#FFE600", "#131313"], [/amazon/i, "#FF9900", "#131313"], [/magazine|magalu/i, "#0086FF", "#fff"],
+  [/casas?\s*bahia/i, "#2E5BFF", "#fff"], [/shopee/i, "#EE4D2D", "#fff"], [/kabum/i, "#FF5A00", "#fff"],
+  [/pichau/i, "#9B5CFF", "#fff"], [/americanas/i, "#E60014", "#fff"], [/shein/i, "#111", "#fff"],
+  [/carrefour/i, "#0A4CA6", "#fff"], [/ponto/i, "#FFD400", "#131313"], [/extra/i, "#14A04B", "#fff"],
+  [/submarino/i, "#19B7FF", "#131313"], [/fast\s*shop/i, "#D6B25E", "#131313"], [/kalunga/i, "#E30613", "#fff"],
+  [/webcontinental/i, "#6C4FE0", "#fff"], [/mobly/i, "#FF4B4B", "#fff"], [/zoom/i, "#7BC142", "#131313"], [/buscap/i, "#2FA14F", "#fff"],
+];
+function siteBadge(site) {
+  const hit = SITE_COLORS.find(([re]) => re.test(site));
+  const bg = hit ? hit[1] : "#1c2b26", fg = hit ? hit[2] : "#bff747";
+  const ini = String(site).replace(/[^a-zA-ZÀ-ÿ0-9 ]/g, "").trim().slice(0, 2).toUpperCase() || "??";
+  return `<span title="${esc(site)}" class="inline-flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-xl font-mono text-xs font-bold" style="background:${bg};color:${fg};box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)">${ini}</span>`;
+}
+function complianceChip(score, isSimilar, missingCount) {
+  const pct = Math.max(5, Math.min(100, score ?? 50));
+  const cls = pct >= 100 ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+    : pct >= 75 ? "border-lime-400/30 bg-lime-400/10 text-lime-300"
+    : pct >= 50 ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+    : "border-rose-400/30 bg-rose-400/10 text-rose-300";
+  const icon = pct >= 100 ? "✔" : "⚠";
+  const sim = isSimilar ? `<span class="rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium text-sky-300">Similar / Equivalente</span>` : "";
+  const pend = missingCount > 0 && pct < 100 ? `<span class="opacity-75">(${missingCount} pend.)</span>` : "";
+  return `<span class="inline-flex flex-wrap items-center gap-1.5"><span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${cls}">${icon} ${pct}% do edital ${pend}</span>${sim}</span>`;
+}
+function toast(msg, ok = true) {
+  const el = document.createElement("div");
+  el.className = `toast rounded-2xl border px-4 py-2.5 text-sm shadow-lg backdrop-blur ${ok ? "border-[var(--volt)]/30 bg-[#0c1214]/95 text-white" : "border-amber-400/30 bg-[#0c1214]/95 text-amber-200"}`;
+  el.textContent = msg;
+  $("#toastWrap").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .4s"; setTimeout(() => el.remove(), 450); }, 3200);
+}
+function parseBRL(raw) {
+  let s = String(raw ?? "").replace(/R\$/g, "").replace(/\s/g, "").trim();
+  if (!s) return null;
+  if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
+  else if (s.includes(",") && s.includes(".")) {
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else s = s.replace(/,/g, "");
+  }
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/* ------------------ configuração (chave Gemini) ------------------ */
+const store = {
+  get key() { return localStorage.getItem("licita_gemini_key") || ""; },
+  set key(v) { localStorage.setItem("licita_gemini_key", v.trim()); },
+};
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+function refreshStatus() {
+  $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (store.key ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
+  $("#statusDot").classList.remove("hidden"); $("#statusDot").classList.add("flex");
+  $("#statusText").textContent = store.key ? "IA gratuita ativa (chave local)" : "configure a chave da IA";
+}
+$("#btnKey").onclick = () => { $("#keyInput").value = store.key; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
+$("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
+$("#saveKeyBtn").onclick = () => {
+  const v = $("#keyInput").value.trim();
+  if (v.length < 10) { toast("Cole uma chave válida.", false); return; }
+  store.key = v; refreshStatus(); $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex");
+  toast("Chave salva no seu navegador.");
+};
+
+/* ------------------ chamadas à IA ------------------ */
+async function geminiCall(parts, maxTokens = 8192) {
+  if (!store.key) { showKeyModal(); throw new Error("Configure a chave da IA para pesquisar."); }
+  let lastErr = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${store.key}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0.15, maxOutputTokens: maxTokens } })
+      });
+      if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error("quota/modelo"); continue; }
+      if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
+      if (text) return { text, model };
+    } catch (e) { lastErr = e; if (!/quota|modelo/.test(String(e))) throw e; }
+  }
+  throw lastErr || new Error("IA indisponível");
+}
+const geminiText = (prompt, mt) => geminiCall([{ text: prompt }], mt);
+const geminiImage = (prompt, b64, mime) => geminiCall([{ text: prompt }, { inlineData: { data: b64, mimeType: mime } }], 4096);
+
+function extractJson(text) {
+  const f = text.match(/```(?:json)?\s*([\s\S]*?)```/); const raw = f ? f[1] : text;
+  const i = raw.indexOf("{"), j = raw.lastIndexOf("}");
+  if (i < 0 || j <= i) return null;
+  try { return JSON.parse(raw.slice(i, j + 1)); } catch { return null; }
+}
+const strArr = (v) => Array.isArray(v) ? v.map(x => typeof x === "string" ? x.trim() : "").filter(Boolean) : [];
+
+/* ------------------ proxy CORS + parsing das lojas ------------------ */
+const PROXIES = ["https://cors.eu.org/", "https://api.allorigins.win/raw?url="];
+async function proxied(url, timeoutMs = 16000) {
+  for (const px of PROXIES) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs);
+      const res = await fetch(px + encodeURIComponent(url).replace(/%2F/g, "/").replace(/%3A/g, ":"), { signal: ctl.signal });
+      clearTimeout(t);
+      if (res.ok) { const txt = await res.text(); if (txt.length > 300) return txt; }
+    } catch { /* tenta o próximo */ }
+  }
+  return null;
+}
+function extractNextData(html) {
+  const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch { return null; }
+}
+function walkProducts(node, out, depth, budget) {
+  if (budget.n <= 0 || depth > 13 || out.length >= 60 || node == null || typeof node !== "object") return;
+  if (Array.isArray(node)) { for (const it of node) { walkProducts(it, out, depth + 1, budget); if (budget.n-- <= 0) return; } return; }
+  budget.n--;
+  const name = node.name || node.productName || node.title;
+  const pr = node.price ?? node.bestPrice ?? node.Price ?? node.salePrice;
+  const price = typeof pr === "number" ? pr : (typeof pr === "string" ? parseBRL(pr) : null);
+  if (typeof name === "string" && name.trim().length >= 12 && price != null && price > 1) {
+    let url = null, code = null;
+    const isMedia = (s) => /\.(jpe?g|png|webp|gif|svg)(\?|$)/i.test(s) || /\/fotos?\/|images?\./i.test(s);
+    for (const [k, v] of Object.entries(node)) {
+      if (typeof v !== "string" && typeof v !== "number") continue;
+      const s = String(v);
+      if (isMedia(s)) continue;
+      if (!url && /^https?:\/\/.{10,}/.test(s)) url = s;
+      if (!url && /^\//.test(s) && s.length > 12 && !s.startsWith("/busca")) url = s;
+      if (!url && /^(link|linktext|slug)$/i.test(k) && /^[a-z0-9][a-z0-9\-/]{8,}$/i.test(s)) url = s;
+      if (!code && /^(code|id|productid|sku)$/i.test(k) && /^\d{4,12}$/.test(s)) code = s;
+    }
+    const brandA = node.brand;
+    const brand = typeof brandA === "string" ? brandA : (brandA && typeof brandA === "object" ? brandA.name : null);
+    out.push({ name: name.trim(), price, url, code, brand: brand || null });
+  }
+  for (const v of Object.values(node)) { walkProducts(v, out, depth + 1, budget); if (budget.n <= 0) return; }
+}
+const storeQuery = (q) => normTxt(q).split(/[^a-z0-9]+/).filter(t => t.length > 1 && !new Set(["mercado","livre","amazon","magazine","luiza","kabum","shopee","casas","bahia","americanas","menor","preco","comprar","online","brasil","oferta","magalu"]).has(t)).slice(0, 7).join(" ");
+
+async function searchKabum(q) {
+  const slug = normTxt(q).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const html = await proxied(`https://www.kabum.com.br/busca/${encodeURIComponent(slug)}`); if (!html) return [];
+  const data = extractNextData(html); if (!data) return [];
+  const found = []; walkProducts(data, found, 0, { n: 4000 });
+  const out = [];
+  for (const p of found) {
+    const url = p.code ? `https://www.kabum.com.br/produto/${p.code}` : (p.url && p.url.startsWith("http") ? p.url : null);
+    if (!url || !url.includes("kabum.com.br")) continue;
+    out.push({ site: "KaBuM!", url, name: p.name, price: p.price, brand: p.brand, confirmed: true, priceSource: "pagina", snippet: "" });
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+async function searchAmericanas(q) {
+  const html = await proxied(`https://www.americanas.com.br/api/catalog_system/pub/products/search?ft=${encodeURIComponent(q)}&_from=0&_to=11`);
+  if (!html) return [];
+  let list; try { list = JSON.parse(html); } catch { return []; }
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const p of list) {
+    let price = null;
+    for (const item of p.items || []) for (const s of item.sellers || []) {
+      const v = typeof s?.commertialOffer?.Price === "number" ? s.commertialOffer.Price : null;
+      if (v && (!price || v < price)) price = v;
+    }
+    const url = p.link || (p.linkText ? `https://www.americanas.com.br/produto/${p.linkText}` : null);
+    if (!p.productName || !price || !url) continue;
+    const b = String(p.brand || "");
+    out.push({ site: "Americanas", url, name: p.productName, price, brand: /não\s*dispon/i.test(b) ? null : b, confirmed: true, priceSource: "pagina", snippet: "" });
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+async function searchComparator(q, base) {
+  const html = await proxied(`https://www.${base}/search?q=${encodeURIComponent(q)}`); if (!html) return [];
+  const data = extractNextData(html); if (!data) return [];
+  const hits = data?.props?.initialReduxState?.hits?.hits || [];
+  const out = [];
+  for (const h of hits) {
+    const seo = h.seoUrl, cat = h.categorySeoUrl, merchant = h.bestOffer?.merchantName;
+    if (!h.name || !h.price || !seo || !cat || !merchant) continue;
+    out.push({ site: merchant, url: `https://www.${base}/${cat}/${seo}`, name: h.name, price: h.price, brand: null, confirmed: true, priceSource: "comparador", snippet: `Oferta de ${merchant} no ${base === "zoom.com.br" ? "Zoom" : "Buscapé"}.` });
+    if (out.length >= 14) break;
+  }
+  return out;
+}
+const TRUSTED = [["mercadolivre", "Mercado Livre"], ["amazon", "Amazon"], ["magazineluiza|magalu", "Magazine Luiza"], ["casasbahia", "Casas Bahia"], ["kabum", "KaBuM!"], ["americanas", "Americanas"], ["shopee", "Shopee"], ["carrefour", "Carrefour"], ["pontofrio|ponto", "Ponto Frio"], ["extra", "Extra"], ["submarino", "Submarino"], ["fastshop|fast shop", "Fast Shop"], ["kalunga", "Kalunga"], ["webcontinental", "Webcontinental"], ["mobly", "Mobly"], ["pichau", "Pichau"]];
+function siteFromUrl(u) {
+  try { const h = new URL(u).hostname.toLowerCase(); const hit = TRUSTED.find(([re]) => new RegExp(re, "i").test(h)); return hit ? hit[1] : h.split(".")[0]; } catch { return "Loja"; }
+}
+function stripTags(h) { return h.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim(); }
+function extractProductFromPage(html) {
+  const acc = [];
+  for (const m of html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { walkJsonLd(JSON.parse(m[1].replace(/[ -]/g, " ")), acc); } catch { /* inválido */ }
+    if (acc.length) break;
+  }
+  if (acc.length) return acc[0];
+  const loose = html.match(/"(?:price|bestPrice)"\s*:\s*"?(\d{1,7}\.\d{2})"?/);
+  if (loose) return { price: Number(loose[1]), name: null, brand: null };
+  return null;
+}
+function walkJsonLd(node, acc) {
+  if (node == null) return;
+  if (Array.isArray(node)) { node.forEach(n => walkJsonLd(n, acc)); return; }
+  if (typeof node !== "object") return;
+  if (Array.isArray(node["@graph"])) walkJsonLd(node["@graph"], acc);
+  const types = Array.isArray(node["@type"]) ? node["@type"] : [node["@type"]];
+  if (types.some(t => typeof t === "string" && /product/i.test(t))) {
+    for (const off of [].concat(node.offers || [])) {
+      const cur = String(off.priceCurrency || "").toUpperCase();
+      if (cur && cur !== "BRL") continue;
+      const p = typeof off.price === "number" ? off.price : parseBRL(String(off.price ?? off.lowPrice ?? ""));
+      if (p && p > 0.5) { acc.push({ price: p, name: node.name ?? null, brand: typeof node.brand === "string" ? node.brand : (node.brand?.name ?? null) }); return; }
+    }
+  }
+}
+async function searchBing(q) {
+  const html = await proxied(`https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=pt-BR&cc=br&count=15`);
+  if (!html) return [];
+  const out = [];
+  for (const block of html.split('<li class="b_algo"').slice(1)) {
+    const h2 = block.match(/<h2[^>]*>([\s\S]*?)<\/h2>/); if (!h2) continue;
+    const p = block.match(/<p[^>]*>([\s\S]*?)<\/p>/);
+    let url = null;
+    for (const m of block.matchAll(/href="([^"]+)"/g)) {
+      const href = m[1].replace(/&amp;/g, "&");
+      if (href.startsWith("http") && !href.includes("bing.com") && !href.includes("microsoft.com")) { url = href; break; }
+      const mm = href.match(/[?&]u=([a-zA-Z0-9_\-]{16,})/);
+      if (mm && href.includes("/ck/")) {
+        let e = mm[1]; if (e.startsWith("a1")) e = e.slice(2);
+        try { const dec = atob(e.replace(/-/g, "+").replace(/_/g, "/") + "=="); if (dec.startsWith("http")) { url = dec; break; } } catch { }
+      }
+    }
+    if (!url) continue;
+    if (!new RegExp(TRUSTED.map(t => t[0]).join("|"), "i").test(url)) continue;
+    out.push({ url, title: stripTags(h2[1]), snippet: p ? stripTags(p[1]) : "" });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+/* Atualização de progresso visual */
+const setStep = (txt) => { const el = $("#loadStep"); if (el) el.textContent = txt; };
+
+async function gatherCandidates(queries, cleanQueries) {
+  const seenUrl = new Set(), seenProd = new Set(), pool = [];
+  const add = (c) => {
+    const key = c.url.split("?")[0].replace(/#.*$/, "");
+    if (seenUrl.has(key) || pool.length >= 120) return;
+    if (USED_RE.test(c.name)) return;
+    const pk = `${normTxt(c.name).replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60)}|${c.price.toFixed(2)}`;
+    if (seenProd.has(pk)) return;
+    seenProd.add(pk); seenUrl.add(key); pool.push(c);
+  };
+  const jobs = [];
+  const cqs = [...new Set(cleanQueries)].slice(0, 3);
+  for (const q of cqs) {
+    jobs.push(searchKabum(q).then(r => { r.forEach(add); }));
+    jobs.push(searchAmericanas(q).then(r => { r.forEach(add); }));
+    jobs.push(searchComparator(q, "zoom.com.br").then(r => { r.forEach(add); }));
+    jobs.push(searchComparator(q, "buscape.com.br").then(r => { r.forEach(add); }));
+  }
+  for (const q of queries.slice(0, 5)) jobs.push(searchBing(q).then(r => {
+    for (const b of r) {
+      const m = b.snippet.match(/R\$\s?([0-9]{1,3}(?:\.[0-9]{3})*,\d{2}|[0-9]{2,7},\d{2})/);
+      const price = m ? parseBRL(m[1]) : null;
+      if (price != null) add({ site: siteFromUrl(b.url), url: b.url, name: b.title, price, brand: null, confirmed: false, priceSource: "busca", snippet: b.snippet });
+    }
+  }));
+  await Promise.allSettled(jobs);
+
+  // round-robin por loja
+  const bySite = new Map();
+  for (const c of pool.sort((a, b) => a.price - b.price)) {
+    const k = c.site.toLowerCase(); const arr = bySite.get(k) || [];
+    if (arr.length < 4) { arr.push(c); bySite.set(k, arr); }
+  }
+  const lists = [...bySite.values()].sort((a, b) => a[0].price - b[0].price);
+  const out = [];
+  for (let r = 0; r < 4; r++) for (const l of lists) if (l[r]) out.push(l[r]);
+  out.forEach((c, i) => c.id = i + 1);
+  return out.slice(0, 40);
+}
+
+/* ------------------ planejamento e avaliação (IA) ------------------ */
+const STOP = new Set("para com sem das dos uma um de do da em no na e ou por que novo nova item unidade conforme deve mínimo mínima máximo incluso produto entrega brasil nota fiscal garantia polegadas cor preto preta branco branca".split(" "));
+function localPlan(txt) {
+  const words = (normTxt(txt).match(/[a-z0-9][a-z0-9.\-/]{2,}/g) || []);
+  const freq = new Map();
+  for (const w of words) { const c = w.replace(/[.\-/]+$/, ""); if (c.length < 3 || STOP.has(c)) continue; freq.set(c, (freq.get(c) || 0) + 1); }
+  const base = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w).join(" ");
+  return { title: txt.split(/[,.;\n]/)[0].trim().slice(0, 80) || "Item do edital",
+    requirements: txt.split(/[,;.\n]+/).map(s => s.trim()).filter(s => s.length > 6).slice(0, 10),
+    queries: [`${base} preço`, `${base} menor preço`, `${base} mercado livre`, `${base} magalu`, `${base} kabum`, `${base} amazon`] };
+}
+function similarHint(mode) {
+  if (mode === "exact") return "IMPORTANTE: o usuário quer SOMENTE o produto exato da marca/modelo do edital. Priorize consultas com marca e modelo exatos.";
+  if (mode === "similar") return "IMPORTANTE: o usuário quer Equivalentes/Similares de marcas alternativas que cumpram as mesmas especificações.";
+  return "Considere tanto o produto exato quanto equivalentes reconhecidos.";
+}
+async function planSearch(txt, filters) {
+  const prompt = `Você é especialista em pesquisa de preços para licitações públicas brasileiras.
+Analise o ITEM DE EDITAL e responda SOMENTE com um bloco \`\`\`json\`\`\` neste formato:
+{"titulo":"nome curto (máx 60)","requisitos":["req 1","req 2"],"consultas":["t1","t2","t3","t4","t5","t6"]}
+Regras: "requisitos" = todos os requisitos obrigatórios (máx. 12), curtos. "consultas" = 6 termos (3 a 7 palavras) sem aspas/site:; as 3 primeiras genéricas do produto (usadas nos catálogos), as 3 últimas podem citar lojas (mercado livre, amazon, magazine luiza, kabum, shopee, carrefour) e "preço".
+${similarHint(filters.similarMode)}
+ITEM DO EDITAL:
+"""
+${txt.slice(0, 4000)}
+"""`;
+  try {
+    const { text } = await geminiText(prompt, 4096);
+    const p = extractJson(text);
+    if (p && strArr(p.requisitos).length && strArr(p.consultas).length >= 2) {
+      return { title: String(p.titulo || "Item do edital").slice(0, 90), requirements: strArr(p.requisitos).slice(0, 12), queries: strArr(p.consultas).slice(0, 6) };
+    }
+  } catch { }
+  return localPlan(txt);
+}
+async function evaluateAll(txt, requirements, candidates, filters) {
+  const list = candidates.slice(0, 24).map(c => `#${c.id} | ${c.site} | ${c.name}${c.brand ? " | " + c.brand : ""} | R$ ${c.price.toFixed(2)}${c.snippet ? "\n   " + c.snippet.slice(0, 200) : ""}`).join("\n");
+  const prompt = `Você é avaliador técnico de conformidade para licitações públicas brasileiras.
+ITEM DO EDITAL:
+"""
+${txt.slice(0, 2500)}
+"""
+REQUISITOS:
+${requirements.map((r, i) => `${i + 1}. ${r}`).join("\n")}
+OFERTAS REAIS (id | loja | nome | preço):
+${list}
+Avalie CADA oferta. Campos: "atende100"(bool), "porcentagem"(inteiro 5 a 100 estimando o atendimento às especificações), "similar"(true se equivalente de outra marca/modelo; false se exato), "faltam"(requisitos ausentes), "marca"(inferida ou null).
+Responda SOMENTE \`\`\`json\`\`\`:
+{"avaliacoes":[{"id":1,"atende100":true,"porcentagem":100,"similar":false,"faltam":[],"marca":"Marca"}]}
+Inclua todos os ids, melhores primeiro.
+${similarHint(filters.similarMode)}
+O usuário exige no mínimo ${filters.minScore}% de atendimento — estime a porcentagem com rigor.`;
+  try {
+    const { text } = await geminiText(prompt, 8192);
+    const p = extractJson(text);
+    const out = [];
+    for (const a of (p?.avaliacoes || [])) {
+      const id = Number(a.id); if (!Number.isFinite(id)) continue;
+      const missing = strArr(a.faltam).slice(0, 6);
+      let sc = Number(a.porcentagem);
+      if (!Number.isFinite(sc) || sc <= 0) sc = a.atende100 === true ? 100 : Math.max(5, Math.round(((requirements.length || 1) - missing.length) / (requirements.length || 1) * 100));
+      sc = Math.max(5, Math.min(100, Math.round(sc)));
+      out.push({ id, compliant: a.atende100 === true || sc === 100, complianceScore: sc, isSimilar: a.similar === true, missing, brand: typeof a.marca === "string" && a.marca !== "null" ? a.marca : null });
+    }
+    if (out.length) return out;
+  } catch { }
+  // fallback local
+  const reqToks = requirements.map(r => [...new Set((normTxt(r).match(/[a-z0-9]{3,}/g) || []).filter(t => !STOP.has(t)))]);
+  return candidates.map(c => {
+    const hay = normTxt(`${c.name} ${c.snippet} ${c.brand || ""}`);
+    let hits = 0; const missing = [];
+    requirements.forEach((r, i) => {
+      const toks = reqToks[i] || [];
+      if (!toks.length) { hits++; return; }
+      const hit = toks.filter(t => hay.includes(t)).length;
+      if (hit / toks.length >= 0.5) hits++; else missing.push(r);
+    });
+    const pct = Math.max(5, Math.min(100, Math.round(hits / (requirements.length || 1) * 100)));
+    return { id: c.id, compliant: missing.length === 0 && requirements.length > 0, complianceScore: pct, isSimilar: true, missing: missing.slice(0, 6), brand: null };
+  });
+}
+
+/* ------------------ motor principal ------------------ */
+async function runAnalysis(editalText, filters) {
+  const plan = await planSearch(editalText, filters);
+  setStep("Varrendo lojas e comparadores do Brasil…");
+  const clean = [...new Set(plan.queries.map(storeQuery).filter(q => q.length > 3))].slice(0, 3);
+  const candidates = await gatherCandidates(plan.queries, clean);
+  if (!candidates.length) throw new Error("Não consegui confirmar ofertas agora (proxy das lojas lento). Tente de novo em alguns segundos.");
+  setStep("IA avaliando a conformidade com o edital…");
+  const verdicts = await evaluateAll(editalText, plan.requirements, candidates, filters);
+  const byId = new Map(candidates.map(c => [c.id, c]));
+  const seen = new Set(); const options = [];
+  for (const v of verdicts) {
+    const c = byId.get(v.id); if (!c || seen.has(v.id)) continue; seen.add(v.id);
+    options.push({ brand: c.brand || v.brand || "—", name: c.name.slice(0, 200), price: c.price, url: c.url, site: c.site,
+      compliant: v.compliant, complianceScore: v.complianceScore, isSimilar: v.isSimilar,
+      missing: v.compliant ? [] : v.missing, confirmed: c.confirmed, priceSource: c.priceSource || "pagina" });
+  }
+  if (options.length < 10) {
+    for (const c of candidates.filter(c => !seen.has(c.id)).sort((a, b) => a.price - b.price).slice(0, 10 - options.length)) {
+      options.push({ brand: c.brand || "—", name: c.name.slice(0, 200), price: c.price, url: c.url, site: c.site,
+        compliant: false, complianceScore: 30, isSimilar: true, missing: ["conformidade não confirmada — verifique no anúncio"], confirmed: c.confirmed, priceSource: c.priceSource || "pagina" });
+    }
+  }
+  // aplica filtros no servidor (aqui, no navegador)
+  const pass = options.filter(o => o.complianceScore >= filters.minScore && (filters.similarMode === "all" || (filters.similarMode === "exact" ? !o.isSimilar : o.isSimilar)));
+  const kept = pass.length >= 3 ? pass : [...pass, ...options.filter(o => !pass.includes(o)).slice(0, 10 - pass.length)];
+  kept.sort((a, b) => b.complianceScore - a.complianceScore || a.price - b.price);
+  const final = kept.slice(0, 10);
+  const prices = final.map(o => o.price);
+  return {
+    id: uid(), title: plan.title, editalText, requirements: plan.requirements, queries: plan.queries,
+    filters, options: final, createdAt: new Date().toISOString(),
+    stats: { min: prices.length ? Math.min(...prices) : null, max: prices.length ? Math.max(...prices) : null, avg: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null }
+  };
+}
+
+/* ------------------ render: cooldown / skeleton / estados ------------------ */
+function showLoading() {
+  $("#resultsPanel").innerHTML = `
+  <div class="absolute inset-x-0 top-0 z-10 flex items-center justify-center gap-2 bg-[#05080a]/85 px-4 py-2.5 text-xs text-[var(--volt)] backdrop-blur-sm">
+    <span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--volt)]/30 border-t-[var(--volt)]"></span>
+    <span id="loadStep">Extraindo requisitos do edital…</span>
+  </div>
+  <div class="flex min-h-[520px] flex-col items-center justify-center px-6 py-16 text-center">
+    <div class="relative mb-8 h-28 w-28">
+      <div class="absolute inset-0 animate-spin rounded-full" style="background:conic-gradient(from 0deg,transparent,rgba(191,247,71,.35),transparent 30%)"></div>
+      <div class="absolute inset-[3px] rounded-full bg-[#05080a]"></div>
+      <div class="absolute inset-0 flex items-center justify-center text-4xl">🔎</div>
+    </div>
+    <h3 class="font-display text-xl font-semibold text-white">Buscando na web em tempo real</h3>
+    <p class="mt-1 text-sm text-[var(--mist)]">A IA está pesquisando anúncios reais agora — leva ~60–90 segundos.</p>
+  </div>`;
+}
+function showError(msg, retry) {
+  $("#resultsPanel").innerHTML = `
+  <div class="flex min-h-[520px] flex-col items-center justify-center px-6 py-16 text-center fade-in">
+    <div class="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10 text-2xl">⚠</div>
+    <h3 class="mt-6 font-display text-xl font-semibold text-white">Não foi possível concluir</h3>
+    <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--mist)]">${esc(msg)}</p>
+    <button id="btnRetry" class="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/80 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]">↻ Tentar de novo</button>
+  </div>`;
+  $("#btnRetry").onclick = retry;
+}
+function showEmpty() {
+  $("#resultsPanel").innerHTML = `
+  <div class="flex min-h-[520px] flex-col items-center justify-center px-6 py-14 text-center fade-in">
+    <div class="text-6xl">🔎</div>
+    <h3 class="mt-6 max-w-md font-display text-2xl font-semibold leading-snug text-white">Cole o edital e descubra <span class="text-[var(--volt)]">quem vende mais barato</span></h3>
+    <p class="mt-3 max-w-sm text-sm leading-relaxed text-[var(--mist)]">Requisitos extraídos por IA, ofertas reais dos marketplaces brasileiros, filtros de conformidade 5%–100% e relatório pronto para a planilha de preços.</p>
+    <div class="mt-8 grid w-full max-w-md grid-cols-3 gap-2 text-center">
+      ${["01 · Cole o edital", "02 · IA busca na web", "03 · Compare e economize"].map(t => `<div class="glass rounded-xl px-2 py-3 text-[11px] text-white/70">${t}</div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* ------------------ render: resultados + filtros ------------------ */
+let current = null;         // resultado atual
+let flt = { minScore: 5, similarMode: "all" };
+let refiltering = false;
+const SITES = ["Amazon", "Mercado Livre", "Magazine Luiza", "Casas Bahia", "Le Biscuit", "Shopee", "Americanas", "KaBuM!", "Pichau", "Extra", "Ponto Frio", "Fast Shop", "Submarino", "Carrefour", "Shein"];
+
+function statsHtml(items) {
+  const prices = items.map(r => r.price);
+  const min = prices.length ? Math.min(...prices) : null, max = prices.length ? Math.max(...prices) : null;
+  const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
+  const eco = min != null && max != null ? max - min : null;
+  return [["Menor oferta (filtrada)", min, true], ["Preço médio", avg], ["Maior oferta", max], ["Economia potencial", eco]]
+    .map(([l, v, a]) => `<div class="glass rounded-2xl p-4 ${a ? "border-[var(--volt)]/25 bg-[var(--volt)]/5" : ""}">
+      <p class="text-[11px] uppercase tracking-[.14em] text-white/40">${l}</p>
+      <span class="mt-1.5 block font-mono text-lg font-semibold tabular-nums sm:text-xl ${a ? "text-[var(--volt)]" : "text-white"}">${fmtBRL(v)}</span></div>`).join("");
+}
+function buildPlainReport(r, items) {
+  const L = [];
+  L.push(`PESQUISA DE PREÇOS — ${r.title.toUpperCase()}`);
+  L.push(`Gerado em ${new Date(r.createdAt).toLocaleString("pt-BR")} • ${items.length} opção(ões)`);
+  if (r.requirements?.length) { L.push(""); L.push("Requisitos obrigatórios identificados:"); r.requirements.forEach((q, i) => L.push(`${i + 1}. ${q}`)); }
+  L.push("");
+  items.forEach((o, i) => {
+    L.push(`${i + 1}.`);
+    L.push(`Marca: ${o.brand}`);
+    L.push(`Nome completo do produto: ${o.name}`);
+    L.push(`Preço: ${fmtBRL(o.price)}`);
+    L.push(`Link direto do anúncio: ${o.url}`);
+    L.push(`Site: ${o.site}`);
+    L.push(`Atendimento estimado ao edital: ${o.complianceScore}%${o.isSimilar ? " (similar/equivalente)" : ""}`);
+    if (!o.compliant && o.missing.length) L.push(`Atenção — não atende 100%: ${o.missing.join("; ")}`);
+    L.push("");
+  });
+  const avg = items.length ? items.reduce((a, b) => a + b.price, 0) / items.length : null;
+  L.push(`Média de preço das opções listadas: ${fmtBRL(avg)}`);
+  return L.join("\n");
+}
+function filteredItems() {
+  if (!current) return [];
+  return current.options.filter(r => {
+    if (r.complianceScore < flt.minScore) return false;
+    if (flt.similarMode === "exact" && r.isSimilar) return false;
+    if (flt.similarMode === "similar" && !r.isSimilar) return false;
+    return true;
+  });
+}
+function renderResults() {
+  const items = filteredItems();
+  const partials = items.filter(r => !r.compliant).length;
+  const dirty = flt.minScore !== (current.filters.minScore ?? 5) || flt.similarMode !== (current.filters.similarMode ?? "all");
+  $("#resultsPanel").innerHTML = `
+  ${refiltering ? `<div class="absolute inset-x-0 top-0 z-20 flex items-center justify-center gap-2 bg-[#05080a]/85 px-4 py-2.5 text-xs text-[var(--volt)] backdrop-blur-sm"><span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--volt)]/30 border-t-[var(--volt)]"></span><span id="loadStep">RePesquisando com seus filtros…</span></div>` : ""}
+  <div class="px-5 py-6 sm:px-7">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="font-mono text-[11px] uppercase tracking-[.28em] text-[var(--volt)]/80">● Cotação gerada</p>
+        <h3 class="mt-2 max-w-xl font-display text-2xl font-semibold leading-tight text-white">${esc(current.title)}</h3>
+        <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
+          <span>${new Date(current.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+          <span class="rounded-full border border-[var(--volt)]/25 bg-[var(--volt)]/10 px-2 py-0.5 text-[11px] text-[var(--volt)]">${current.options.filter(o => o.compliant).length} de ${current.options.length} atendem 100%</span>
+          <span class="rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-white/55">filtros da busca: ≥${current.filters.minScore}% · ${current.filters.similarMode === "exact" ? "exatos" : current.filters.similarMode === "similar" ? "similares" : "todos"}</span>
+        </p>
+      </div>
+      <div class="flex shrink-0 gap-2">
+        <button id="btnCopyReport" class="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]">⧉ Copiar relatório</button>
+        <button id="btnNewSearch" class="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]">↻ Nova busca</button>
+      </div>
+    </div>
+
+    ${current.requirements.length ? `<div class="mt-6">
+      <p class="font-mono text-[11px] uppercase tracking-[.2em] text-white/40">Requisitos obrigatórios identificados (${current.requirements.length})</p>
+      <div class="mt-3 flex flex-wrap gap-2">${current.requirements.map(r => `<span class="inline-flex max-w-full items-start gap-1.5 rounded-lg border border-white/10 bg-white/[.03] px-2.5 py-1.5 text-xs leading-snug text-white/75">✔ ${esc(r)}</span>`).join("")}</div>
+    </div>` : ""}
+
+    <!-- Filtros -->
+    <div class="glass mt-7 rounded-2xl border border-white/10 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-3">
+        <p class="font-mono text-[11px] uppercase tracking-[.2em] text-[var(--volt)]">☰ Filtros — aplicam nova pesquisa</p>
+        <span class="font-mono text-xs text-white/50">Exibindo <strong class="text-[var(--volt)]">${items.length}</strong> de ${current.options.length}</span>
+      </div>
+      <div class="mt-4 grid gap-5 md:grid-cols-2">
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-medium text-white/80">Atendimento mínimo do edital:</label>
+            <span id="minScoreLbl" class="rounded-md border border-[var(--volt)]/30 bg-[var(--volt)]/10 px-2 py-0.5 font-mono text-xs font-bold text-[var(--volt)]">≥ ${flt.minScore}%</span>
+          </div>
+          <input id="minScoreSlider" type="range" min="5" max="100" step="5" value="${flt.minScore}" class="mt-2.5 h-1.5 w-full cursor-pointer rounded-lg bg-white/15" />
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            ${[[100, "100% (Integral)"], [80, "≥ 80%"], [50, "≥ 50%"], [5, "Todos (≥ 5%)"]].map(([v, l]) => `<button data-score="${v}" class="scoreBtn rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${flt.minScore === v ? "bg-[var(--volt)] font-semibold text-[#05080a]" : "border border-white/10 bg-white/[.03] text-white/60 hover:border-[var(--volt)]/40 hover:text-white"}">${l}</button>`).join("")}
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-white/80">Filtro de Similares / Equivalentes:</label>
+          <div class="mt-2.5 grid grid-cols-3 gap-1.5">
+            ${[["all", "Todos"], ["exact", "Apenas Exatos"], ["similar", "Apenas Similares"]].map(([v, l]) => `<button data-sim="${v}" class="simBtn rounded-xl px-2 py-2 text-center text-xs font-medium transition ${flt.similarMode === v ? "bg-[var(--volt)] font-semibold text-[#05080a]" : "border border-white/10 bg-white/[.03] text-white/60 hover:border-[var(--volt)]/40 hover:text-white"}">${l}</button>`).join("")}
+          </div>
+          <p class="mt-2 text-[11px] text-white/40">${flt.similarMode === "all" ? "Marca exata + similares técnicos." : flt.similarMode === "exact" ? "Somente marca/modelo exato do edital." : "Somente equivalentes de outras marcas."}</p>
+        </div>
+      </div>
+      <button id="btnConsultFilters" ${dirty ? "" : "disabled"} class="mt-4 flex w-full items-center justify-center gap-2.5 rounded-2xl px-5 py-3.5 font-display text-sm font-bold uppercase tracking-wide transition ${dirty ? "bg-[var(--volt)] text-[#05080a] shadow-[0_0_24px_rgba(191,247,71,.3)] hover:shadow-[0_0_36px_rgba(191,247,71,.45)]" : "cursor-not-allowed border border-white/10 bg-white/[.03] text-white/35"}">
+        ${refiltering ? "⏳ Consultando com seus filtros…" : dirty ? "🔎 CONSULTAR COM ESTES FILTROS" : "✔ Filtros atuais já consultados"}
+      </button>
+      ${dirty && !refiltering ? `<p class="mt-2 text-center font-mono text-[11px] text-white/35">Nova pesquisa real na web (~60s) — dispara automaticamente em 1s também</p>` : ""}
+    </div>
+
+    <div class="mt-7 grid grid-cols-2 gap-2.5 lg:grid-cols-4">${statsHtml(items)}</div>
+
+    <div class="mt-7 overflow-hidden rounded-2xl border border-white/10">
+      ${items.length === 0 ? `<div class="p-10 text-center">
+          <p class="font-medium text-white">Nenhuma opção com os filtros selecionados</p>
+          <p class="mt-1 text-xs text-[var(--mist)]">Diminua a porcentagem mínima ou troque o filtro de similares.</p>
+          <button id="btnResetFilters" class="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-1.5 text-xs text-white/80 transition hover:border-[var(--volt)]/40 hover:text-[var(--volt)]">↻ Restaurar filtros (≥5% / Todos)</button>
+        </div>`
+      : items.map((r, i) => `
+        <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer nofollow" class="group grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-white/5 px-4 py-4 transition last:border-b-0 hover:bg-white/[.03] sm:grid-cols-[auto_auto_1fr_auto] sm:gap-4 sm:px-5 ${!r.compliant ? "bg-amber-400/[.02]" : ""}">
+          <span class="text-outline font-mono text-2xl font-bold sm:text-3xl">${String(i + 1).padStart(2, "0")}</span>
+          <span class="hidden sm:block">${siteBadge(r.site)}</span>
+          <span class="min-w-0">
+            <span class="font-mono text-[11px] uppercase tracking-[.14em] text-white/45">${esc(r.brand)}</span>
+            <span class="mt-0.5 line-clamp-2 block text-sm font-medium leading-snug text-white/90 transition group-hover:text-[var(--volt)]">${esc(r.name)}</span>
+            <span class="mt-1.5 flex flex-wrap items-center gap-2">${complianceChip(r.complianceScore, r.isSimilar, r.missing.length)}<span class="text-[11px] text-white/40">${esc(r.site)}</span></span>
+            ${!r.compliant && r.missing.length ? `<span class="mt-1.5 block text-[11px] leading-snug text-amber-300/80">Não cumpre: ${esc(r.missing.join(" · "))}</span>` : ""}
+          </span>
+          <span class="flex items-center gap-2 sm:gap-3">
+            <span class="text-right">
+              <span class="block font-mono text-base font-semibold tabular-nums text-white sm:text-lg">${fmtBRL(r.price)}</span>
+              <span class="hidden text-[10px] uppercase tracking-wider text-white/35 sm:block">${r.priceSource === "busca" ? "visto na busca" : r.priceSource === "comparador" ? "via comparador" : "na página da loja"}</span>
+            </span>
+            <span class="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-white/50 transition group-hover:border-[var(--volt)] group-hover:bg-[var(--volt)] group-hover:text-[#05080a]">↗</span>
+          </span>
+        </a>`).join("")}
+    </div>
+    ${partials > 0 ? `<p class="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-300/70">⚠ ${partials} opção(ões) não cumprem 100% — ajuste o filtro para "100% (Integral)" para ver apenas as estritamente conformes.</p>` : ""}
+
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--volt)]/25 bg-gradient-to-r from-[#bff7471a] to-transparent px-5 py-4">
+      <p class="font-mono text-[11px] uppercase tracking-[.22em] text-[var(--volt)]/80">Média de preço das opções filtradas (${items.length})</p>
+      <span class="font-mono text-2xl font-bold tabular-nums text-[var(--volt)] sm:text-3xl">${fmtBRL(items.length ? items.reduce((a, b) => a + b.price, 0) / items.length : null)}</span>
+    </div>
+
+    <p class="mt-5 text-[11px] leading-relaxed text-white/35">Preços capturados por IA em tempo real na data da busca (fontes: catálogos KaBuM!/Americanas, comparadores Zoom/Buscapé e buscador, via proxy CORS comunitário). Confirme valor, frete e disponibilidade no anúncio antes de formalizar a cotação (Lei nº 14.133/21).</p>
+  </div>`;
+
+  // binds
+  $("#btnCopyReport").onclick = async () => {
+    try { await navigator.clipboard.writeText(buildPlainReport(current, items)); toast("Relatório copiado!"); } catch { toast("Falha ao copiar — selecione e copie manualmente.", false); }
+  };
+  $("#btnNewSearch").onclick = () => { showEmpty(); $("#editalInput").focus(); };
+  $("#minScoreSlider").oninput = (e) => { const v = Number(e.target.value); $("#minScoreLbl").textContent = `≥ ${v}%`; };
+  $("#minScoreSlider").onchange = (e) => { flt.minScore = Number(e.target.value); scheduleRefilter(); renderResults(); };
+  document.querySelectorAll(".scoreBtn").forEach(b => b.onclick = () => { flt.minScore = Number(b.dataset.score); scheduleRefilter(); renderResults(); });
+  document.querySelectorAll(".simBtn").forEach(b => b.onclick = () => { flt.similarMode = b.dataset.sim; scheduleRefilter(); renderResults(); });
+  $("#btnConsultFilters").onclick = () => doRefilter();
+  const rst = $("#btnResetFilters"); if (rst) rst.onclick = () => { flt = { minScore: 5, similarMode: "all" }; scheduleRefilter(); renderResults(); };
+}
+
+/* ------------------ disparo de nova pesquisa com filtros ------------------ */
+let refilterTimer = null;
+function scheduleRefilter() {
+  clearTimeout(refilterTimer);
+  refilterTimer = setTimeout(doRefilter, 1100);
+}
+async function doRefilter() {
+  clearTimeout(refilterTimer);
+  const text = $("#editalInput").value.trim();
+  if (text.length < 15 || refiltering) return;
+  refiltering = true; renderResults();
+  try {
+    const result = await runAnalysis(text, { ...flt });
+    current = result;
+    saveHistory(result);
+    renderHistory();
+    // a pesquisa real já aplica os filtros — solta o filtro visual para ver tudo recém-buscado
+    renderResults();
+  } catch (e) {
+    toast(e.message || "Falha na repesquisa.", false);
+  } finally {
+    refiltering = false;
+    renderResults();
+  }
+}
+
+/* ------------------ fluxo principal ------------------ */
+async function runSearch() {
+  const text = $("#editalInput").value.trim();
+  if (text.length < 15) { toast("Descreva o item do edital (mín. 15 caracteres).", false); return; }
+  if (!store.key) { showKeyModal(); return; }
+  $("#btnConsult").disabled = true; $("#btnConsultLabel").textContent = "Consultando na web…";
+  showLoading();
+  $("#resultsWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+  try {
+    flt = { minScore: 5, similarMode: "all" };
+    const result = await runAnalysis(text, { ...flt });
+    current = result;
+    saveHistory(result); renderHistory(); renderResults();
+  } catch (e) {
+    showError(e.message || "Erro inesperado.", runSearch);
+  } finally {
+    $("#btnConsult").disabled = false; $("#btnConsultLabel").textContent = "CONSULTAR MENOR PREÇO";
+  }
+}
+$("#btnConsult").onclick = runSearch;
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); runSearch(); }
+});
+$("#editalInput").oninput = (e) => { $("#charCount").textContent = `${e.target.value.length}/8000`; };
+function showKeyModal() { $("#keyInput").value = store.key; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
+
+/* ------------------ histórico (localStorage) ------------------ */
+const HKEY = "licita_historico_v1";
+function loadHistory() { try { return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch { return []; } }
+function saveHistory(r) {
+  const h = loadHistory();
+  h.unshift(r);
+  localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 40)));
+}
+function renderHistory() {
+  const h = loadHistory();
+  if (!h.length) {
+    $("#historyPanel").innerHTML = `<div class="rounded-3xl border border-dashed border-white/[.12] px-6 py-10 text-center"><p class="text-sm text-white/45">Nenhuma cotação ainda — faça a primeira busca acima. Ela fica salva neste navegador.</p></div>`;
+    $("#historyActions").innerHTML = "";
+    return;
+  }
+  $("#historyActions").innerHTML = `
+    <span class="font-mono text-xs text-white/35">${h.length} salvas</span>
+    <button id="btnDeleteAll" class="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 transition hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300">🗑 Limpar histórico</button>`;
+  $("#btnDeleteAll").onclick = () => {
+    if (!confirm("Apagar TODAS as cotações salvas neste navegador?")) return;
+    localStorage.removeItem(HKEY); renderHistory(); toast("Histórico esvaziado.");
+  };
+  $("#historyPanel").innerHTML = `
+  <ul class="glass divide-y divide-white/5 overflow-hidden rounded-3xl">
+    ${h.map((s, i) => {
+      const prices = (s.options || []).map(o => o.price);
+      const min = prices.length ? Math.min(...prices) : null;
+      const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
+      return `<li>
+        <div role="button" data-id="${s.id}" class="histRow group grid cursor-pointer grid-cols-[1fr_auto] items-center gap-3 px-5 py-4 transition hover:bg-white/[.03] sm:grid-cols-[1fr_auto_auto_auto]">
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-medium text-white/90 transition group-hover:text-[var(--volt)]">${esc(s.title)}</span>
+            <span class="mt-0.5 block font-mono text-[11px] text-white/35">${new Date(s.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${(s.options || []).length} opções · ${(s.options || []).filter(o => o.compliant).length} 100%</span>
+          </span>
+          <span class="hidden text-right sm:block"><span class="block text-[10px] uppercase tracking-wider text-white/35">menor</span><span class="font-mono text-sm font-semibold tabular-nums text-[var(--volt)]">${fmtBRL(min)}</span></span>
+          <span class="hidden text-right sm:block"><span class="block text-[10px] uppercase tracking-wider text-white/35">média</span><span class="font-mono text-sm tabular-nums text-white/75">${fmtBRL(avg)}</span></span>
+          <button data-id="${s.id}" class="histDel flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-rose-500/10 hover:text-rose-400" aria-label="Excluir">✕</button>
+        </div>
+      </li>`;
+    }).join("")}
+  </ul>`;
+  document.querySelectorAll(".histRow").forEach(el => el.onclick = (e) => {
+    if (e.target.closest(".histDel")) return;
+    const s = loadHistory().find(x => x.id === el.dataset.id);
+    if (s) { current = s; flt = { minScore: s.filters?.minScore ?? 5, similarMode: s.filters?.similarMode ?? "all" }; renderResults(); $("#resultsWrap").scrollIntoView({ behavior: "smooth" }); }
+  });
+  document.querySelectorAll(".histDel").forEach(el => el.onclick = (e) => {
+    e.stopPropagation();
+    const h = loadHistory().filter(x => x.id !== el.dataset.id);
+    localStorage.setItem(HKEY, JSON.stringify(h));
+    renderHistory(); toast("Cotação excluída.");
+  });
+}
+
+/* ------------------ busca por FOTO ------------------ */
+let imageBlob = null;
+function renderImageZone(pasted) {
+  if (!imageBlob) {
+    $("#imageZone").innerHTML = `<button id="btnPickImage" class="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[.02] px-4 py-3 text-xs text-white/55 transition hover:border-[var(--volt)]/40 hover:text-[var(--volt)]">🖼 Busque por foto — <kbd class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px]">Ctrl+V</kbd> cole, arraste ou clique</button>`;
+    $("#btnPickImage").onclick = () => $("#imageInput").click();
+    return;
+  }
+  const url = URL.createObjectURL(imageBlob);
+  $("#imageZone").innerHTML = `
+  <div class="flex items-center gap-3 rounded-2xl border ${pasted ? "border-[var(--volt)]" : "border-[var(--volt)]/25"} bg-[var(--volt)]/[.04] p-3">
+    <img src="${url}" class="h-16 w-16 shrink-0 rounded-xl border border-white/10 object-cover" alt="produto" />
+    <div class="min-w-0 flex-1">
+      <p class="text-xs leading-snug text-white/70">${pasted ? '<span class="font-medium text-[var(--volt)]">Imagem colada! </span>' : ""}A IA identifica o produto e busca os menores preços.</p>
+      <div class="mt-2 flex gap-2">
+        <button id="btnImgSearch" class="inline-flex items-center gap-1.5 rounded-full bg-[var(--volt)] px-3.5 py-1.5 text-xs font-semibold text-[#05080a] transition hover:shadow-[0_0_20px_rgba(191,247,71,.35)]">🔍 Identificar e consultar</button>
+        <button id="btnImgClear" class="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/60 transition hover:text-white">✕ Remover</button>
+      </div>
+    </div>
+  </div>`;
+  $("#btnImgClear").onclick = () => { imageBlob = null; $("#imageInput").value = ""; renderImageZone(); };
+  $("#btnImgSearch").onclick = runImageSearch;
+}
+function resizeImage(file, maxSide = 1280) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      c.toBlob(b => b ? resolve(b) : reject(new Error("falha")), "image/jpeg", 0.85);
+    };
+    img.onerror = () => reject(new Error("imagem inválida"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function handleImageFile(f, pasted) {
+  try { imageBlob = await resizeImage(f); renderImageZone(pasted); } catch { toast("Não consegui ler a imagem.", false); }
+}
+$("#imageInput").onchange = (e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); };
+document.addEventListener("paste", (e) => {
+  for (const it of e.clipboardData?.items || []) {
+    if (it.kind === "file" && it.type.startsWith("image/")) { const f = it.getAsFile(); if (f) { e.preventDefault(); handleImageFile(f, true); } return; }
+  }
+});
+document.addEventListener("dragover", (e) => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); $("#dragOverlay").classList.remove("hidden"); $("#dragOverlay").classList.add("flex"); } });
+document.addEventListener("dragleave", (e) => { if (e.relatedTarget === null) { $("#dragOverlay").classList.add("hidden"); $("#dragOverlay").classList.remove("flex"); } });
+document.addEventListener("drop", (e) => {
+  const f = e.dataTransfer?.files?.[0];
+  if (f && f.type.startsWith("image/")) { e.preventDefault(); handleImageFile(f); }
+  $("#dragOverlay").classList.add("hidden"); $("#dragOverlay").classList.remove("flex");
+});
+async function runImageSearch() {
+  if (!imageBlob) return;
+  if (!store.key) { showKeyModal(); return; }
+  showLoading(); setStep("IA identificando o produto na foto…");
+  const fr = new FileReader();
+  fr.onload = async () => {
+    try {
+      const b64 = String(fr.result).split(",")[1];
+      const prompt = `Você é especialista em identificação de produtos para pesquisa de preços de licitações. Analise a imagem e responda SOMENTE com \`\`\`json\`\`\`:
+{"produto":"nome como buscado numa loja (máx 80)","marca":"marca ou null","especificacoes":["atributo 1","atributo 2"],"consultas":["t1","t2","t3","t4","t5","t6"]}
+Regras: marca/modelo/características visíveis; até 10 atributos curtos; 6 consultas (3 primeiras genéricas; 3 últimas podem citar lojas: mercado livre, amazon, magalu, kabum, shopee, carrefour).`;
+      const { text } = await geminiImage(prompt, b64, "image/jpeg");
+      const p = extractJson(text);
+      const produto = String(p?.produto || ""), specs = strArr(p?.especificacoes).slice(0, 10), qs = strArr(p?.consultas).slice(0, 6);
+      const marca = typeof p?.marca === "string" && p.marca !== "null" ? p.marca : null;
+      if (!produto || specs.length === 0 || qs.length < 2) throw new Error("Não identifiquei o produto nesta foto. Envie uma foto nítida.");
+      const desc = `${produto}. Especificações identificadas na imagem: ${specs.join(", ")}.` + (marca ? ` Marca: ${marca}.` : "") + " Produto novo, com nota fiscal, entrega no Brasil.";
+      $("#editalInput").value = desc; $("#charCount").textContent = `${desc.length}/8000`;
+      flt = { minScore: 5, similarMode: "all" };
+      const result = await runAnalysis(desc, { ...flt });
+      current = result; saveHistory(result); renderHistory(); renderResults();
+    } catch (e) { showError(e.message, runImageSearch); }
+  };
+  fr.readAsDataURL(imageBlob);
+}
+
+/* ------------------ TERMOS DE REFERÊNCIA ------------------ */
+let tr = null; // { filename, items:[{order,label,title,editalText,qty,status,result,error,searchSummary}] , runningAll, stopAll }
+async function extractTrText(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (ext === "pdf") {
+    const pdfjs = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+    const buf = await file.arrayBuffer();
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+    let text = "";
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      text += tc.items.map(i => i.str).join(" ") + "\n";
+      if (text.length > 30000) break;
+    }
+    return text.replace(/[ \t]+/g, " ").slice(0, 30000);
+  }
+  if (ext === "docx") {
+    const { value } = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    return value.slice(0, 30000);
+  }
+  return (await file.text()).slice(0, 30000);
+}
+function parseQty(t) {
+  const m = t.match(/(?:qtde?|quant(?:idade)?|volume)\s*[:\-–]?\s*(\d{1,6})/i) || t.match(/(\d{1,5})\s*(?:unidades?|und?\.?|peças|pares?|kits?|caixas?|resmas?)\b/i);
+  return m ? Number(m[1]) : null;
+}
+async function segmentTr(text) {
+  const prompt = `Você é especialista em licitações. Separe TODOS os itens numerados deste TERMO DE REFERÊNCIA. Para cada: "rotulo"(ex "Item 3"), "titulo"(máx 70), "quantidade"(inteiro ou null), "texto"(descrição completa com specs, máx 900 car.). Máx 25 itens; ignore preâmbulo/condições gerais. Responda SOMENTE \`\`\`json\`\`\`:
+{"itens":[{"rotulo":"Item 1","titulo":"...","quantidade":10,"texto":"..."}]}
+TERMO DE REFERÊNCIA:
+"""
+${text.slice(0, 22000)}
+"""`;
+  try {
+    const { text: out } = await geminiText(prompt, 16384);
+    const p = extractJson(out);
+    const items = [];
+    for (const o of (p?.itens || [])) {
+      const t = String(o.texto || "").trim();
+      if (t.length < 30) continue;
+      items.push({ order: items.length + 1, label: String(o.rotulo || `Item ${items.length + 1}`), title: String(o.titulo || "Item").slice(0, 90), editalText: t.slice(0, 1400), qty: typeof o.quantidade === "number" && o.quantidade > 0 ? Math.floor(o.quantidade) : parseQty(t), status: "idle", result: null, error: null });
+      if (items.length >= 25) break;
+    }
+    if (items.length) return items;
+  } catch { }
+  // fallback local
+  const lines = text.split("\n");
+  const re = /^\s*(?:item|lote)\s+(?:n[ºo°.]?\s*)?(\d{1,3})\b[\s.\):\-–]?(.*)$/i;
+  const idx = lines.map((l, i) => re.test(l) ? i : -1).filter(i => i >= 0);
+  const items = [];
+  for (let s = 0; s < idx.length && items.length < 25; s++) {
+    const chunk = lines.slice(idx[s], idx[s + 1] ?? lines.length).join("\n").trim();
+    if (chunk.length < 40) continue;
+    const m = lines[idx[s]].match(re);
+    items.push({ order: items.length + 1, label: `Item ${Number(m[1])}`, title: (m[2] || lines[idx[s]]).split(/[;,.\n]/)[0].trim().slice(0, 80), editalText: chunk.slice(0, 1400), qty: parseQty(chunk), status: "idle", result: null, error: null });
+  }
+  return items;
+}
+function renderTr() {
+  if (!tr) {
+    $("#trActions").innerHTML = "";
+    $("#trPanel").innerHTML = `
+    <div id="trDrop" class="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/15 bg-white/[.015] px-6 py-12 text-center transition hover:border-[var(--volt)]/50 cursor-pointer">
+      <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--volt)]/25 bg-[var(--volt)]/10 text-2xl">📥</div>
+      <p class="mt-4 font-display text-lg font-semibold text-white">Arraste o TR aqui ou clique para escolher</p>
+      <p class="mt-1 max-w-md text-sm text-[var(--mist)]">PDF, DOCX, TXT, MD ou CSV (até 12 MB). A IA identifica os itens, especificações e quantidades.</p>
+      <span class="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--volt)] px-5 py-2.5 text-sm font-semibold text-[#05080a]">📄 Importar Termo de Referência</span>
+    </div>`;
+    $("#trDrop").onclick = () => $("#trFileInput").click();
+    $("#trDrop").ondragover = (e) => { e.preventDefault(); $("#trDrop").classList.add("border-[var(--volt)]/60", "bg-[var(--volt)]/[.04]"); };
+    $("#trDrop").ondragleave = () => $("#trDrop").classList.remove("border-[var(--volt)]/60", "bg-[var(--volt)]/[.04]");
+    $("#trDrop").ondrop = (e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) importTr(f); };
+    return;
+  }
+  const done = tr.items.filter(i => i.status === "done").length;
+  const total = tr.items.filter(i => i.result?.stats?.min != null).reduce((a, i) => a + i.result.stats.min * (i.qty ?? 1), 0);
+  const progress = tr.items.length ? Math.round(done / tr.items.length * 100) : 0;
+  $("#trActions").innerHTML = `
+    <button id="btnTrReport" class="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)] disabled:opacity-35" ${done ? "" : "disabled"}>⧉ Relatório do TR</button>
+    <button id="btnTrNew" class="rounded-full border border-white/15 px-4 py-2 text-sm text-white/60 transition hover:border-white/30 hover:text-white">✕ Novo TR</button>`;
+  $("#btnTrNew").onclick = () => { tr = null; $("#trFileInput").value = ""; saveTrState(); renderTr(); };
+  $("#btnTrReport").onclick = copyTrReport;
+  $("#trPanel").innerHTML = `
+  <div class="overflow-hidden rounded-3xl border border-white/10">
+    <div class="glass flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-6">
+      <div class="min-w-0">
+        <p class="truncate text-sm font-medium text-white">📄 ${esc(tr.filename)}</p>
+        <p class="mt-0.5 font-mono text-[11px] text-white/40">${tr.items.length} itens · ${done} pesquisados</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="mr-1 hidden h-1.5 w-32 overflow-hidden rounded-full bg-white/10 sm:block"><div class="h-full rounded-full bg-[var(--volt)] transition-all duration-500" style="width:${progress}%"></div></div>
+        ${tr.runningAll
+          ? `<button id="btnTrStop" class="rounded-full border border-rose-400/40 bg-rose-400/10 px-4 py-2 text-sm text-rose-300 transition hover:bg-rose-400/20">■ Parar após este item</button>`
+          : `<button id="btnTrAll" class="rounded-full bg-[var(--volt)] px-4 py-2 text-sm font-semibold text-[#05080a] transition hover:shadow-[0_0_28px_rgba(191,247,71,.35)] disabled:opacity-40" ${done === tr.items.length ? "disabled" : ""}>${done === 0 ? "▶ Pesquisar todos" : done < tr.items.length ? "▶ Continuar busca" : "✔ Tudo pesquisado"}</button>`}
+      </div>
+    </div>
+    <ul class="divide-y divide-white/5 bg-[#05080a]/60">
+      ${tr.items.map(it => `
+      <li class="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-5 py-3.5 transition hover:bg-white/[.02] sm:grid-cols-[auto_1fr_auto_auto_auto] sm:gap-4 sm:px-6">
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[.03] font-mono text-xs font-bold text-[var(--volt)]">${String(it.order).padStart(2, "0")}</span>
+        <span class="min-w-0">
+          <span class="block truncate text-sm font-medium text-white/90"><span class="mr-2 font-mono text-[11px] uppercase text-white/35">${esc(it.label)}</span>${esc(it.title)}</span>
+          <span class="mt-0.5 block text-[11px] text-white/40">Qtd: <span class="font-mono">${it.qty ?? 1}</span>${it.error ? `<span class="ml-2 text-amber-300/90">• ${esc(it.error)}</span>` : ""}</span>
+        </span>
+        <span class="hidden sm:block">
+          ${it.status === "done" ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--volt)]/25 bg-[var(--volt)]/10 px-2.5 py-1 text-[11px] text-[var(--volt)]">${it.result.options.length} opções · ${it.result.options.filter(o => o.compliant).length} 100%</span>`
+          : it.status === "running" ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-[var(--volt)]/80"><span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--volt)]/30 border-t-[var(--volt)]"></span>consultando</span>`
+          : it.status === "error" ? `<span class="rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-300">⚠ erro</span>`
+          : `<span class="px-2.5 py-1 font-mono text-[11px] text-white/30">pendente</span>`}
+        </span>
+        <span class="text-right">${it.result?.stats?.min != null ? `<span class="block font-mono text-sm font-semibold tabular-nums text-[var(--volt)]">${fmtBRL(it.result.stats.min)}</span><span class="block text-[10px] uppercase tracking-wider text-white/35">menor unit.</span>` : `<span class="font-mono text-xs text-white/25">—</span>`}</span>
+        <span class="flex items-center gap-1.5">
+          ${it.status === "done"
+            ? `<button class="trView rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-white/70 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]" data-o="${it.order}">VER COTAÇÃO</button>
+               <button class="trRedo flex h-8 w-8 items-center justify-center rounded-full text-white/35 transition hover:bg-white/10 hover:text-[var(--volt)]" data-o="${it.order}" title="Refazer">↻</button>`
+            : `<button class="trRun inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold tracking-wide transition ${it.status === "running" ? "bg-[var(--volt)]/60 text-[#05080a]" : it.status === "error" ? "border border-amber-400/40 text-amber-300" : "bg-[var(--volt)] text-[#05080a] hover:shadow-[0_0_20px_rgba(191,247,71,.35)]"}" data-o="${it.order}" ${it.status === "running" || tr.runningAll ? "disabled" : ""}>${it.status === "running" ? "⏳ CONSULTANDO…" : it.status === "error" ? "↻ RETENTAR" : "▶ CONSULTAR"}</button>`}
+        </span>
+      </li>`).join("")}
+    </ul>
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--volt)]/20 bg-gradient-to-r from-[#bff7471a] to-transparent px-5 py-4 sm:px-6">
+      <p class="font-mono text-[11px] uppercase tracking-[.22em] text-[var(--volt)]/80">∑ Valor estimado do objeto (${done}/${tr.items.length} cotados)</p>
+      <div class="text-right"><span class="font-mono text-2xl font-bold tabular-nums text-[var(--volt)]">${done ? fmtBRL(total) : "—"}</span>
+      <p class="text-[10px] uppercase tracking-wider text-white/35">soma dos menores × quantidades</p></div>
+    </div>
+  </div>`;
+  document.querySelectorAll(".trRun").forEach(b => b.onclick = () => runTrItem(Number(b.dataset.o)));
+  document.querySelectorAll(".trRedo").forEach(b => b.onclick = () => runTrItem(Number(b.dataset.o)));
+  document.querySelectorAll(".trView").forEach(b => b.onclick = () => {
+    const it = tr.items.find(x => x.order === Number(b.dataset.o));
+    if (it?.result) { current = it.result; flt = { minScore: 5, similarMode: "all" }; renderResults(); $("#resultsWrap").scrollIntoView({ behavior: "smooth" }); }
+  });
+  const bAll = $("#btnTrAll"); if (bAll) bAll.onclick = runTrAll;
+  const bStop = $("#btnTrStop"); if (bStop) bStop.onclick = () => { tr.stopAll = true; };
+}
+async function importTr(file) {
+  if (file.size > 12 * 1024 * 1024) { toast("Arquivo muito grande (máx. 12 MB).", false); return; }
+  $("#trPanel").innerHTML = `<div class="flex flex-col items-center justify-center rounded-3xl border border-white/10 px-6 py-14 text-center"><span class="inline-block h-8 w-8 animate-spin rounded-full border-2 border-[var(--volt)]/30 border-t-[var(--volt)]"></span><p class="mt-4 font-display text-lg font-semibold text-white">Lendo o documento…</p><p class="mt-1 text-sm text-[var(--mist)]">Extraindo texto e separando os itens do TR.</p></div>`;
+  try {
+    const text = await extractTrText(file);
+    if (text.length < 200) throw new Error("Pouco texto extraído. Se for PDF digitalizado (imagem), converta para texto (OCR) antes.");
+    const items = await segmentTr(text);
+    if (!items.length) throw new Error("Não identifiquei itens numerados. Numere os itens (ex.: “Item 1 — …”) e tente de novo.");
+    tr = { filename: file.name, items, runningAll: false, stopAll: false };
+    saveTrState(); renderTr();
+    toast(`${items.length} itens identificados no TR.`);
+  } catch (e) { tr = null; renderTr(); toast(e.message, false); }
+}
+$("#trFileInput").onchange = (e) => { const f = e.target.files?.[0]; if (f) importTr(f); };
+async function runTrItem(order) {
+  if (!tr || !store.key) { if (!store.key) showKeyModal(); return; }
+  const it = tr.items.find(x => x.order === order); if (!it) return;
+  it.status = "running"; it.error = null; renderTr();
+  try {
+    const r = await runAnalysis(it.editalText, { minScore: 5, similarMode: "all" });
+    it.result = r; it.status = "done";
+    saveHistory({ ...r, title: `${it.label} — ${it.title}` }); renderHistory();
+    current = r; flt = { minScore: 5, similarMode: "all" }; renderResults();
+  } catch (e) { it.status = "error"; it.error = (e.message || "erro").slice(0, 120); }
+  saveTrState(); renderTr();
+}
+async function runTrAll() {
+  if (!tr || tr.runningAll) return;
+  tr.runningAll = true; tr.stopAll = false; renderTr();
+  for (const it of tr.items) {
+    if (tr.stopAll) break;
+    if (it.status === "done" || it.status === "running") continue;
+    await runTrItem(it.order);
+  }
+  tr.runningAll = false; saveTrState(); renderTr();
+}
+function buildTrReport() {
+  const L = [];
+  L.push("RELATÓRIO CONSOLIDADO DE PESQUISA DE PREÇOS — TERMO DE REFERÊNCIA");
+  L.push(`Arquivo: ${tr.filename} • Gerado em ${new Date().toLocaleString("pt-BR")} • Itens: ${tr.items.length}`);
+  const done = tr.items.filter(i => i.result?.stats?.min != null);
+  const total = done.reduce((a, i) => a + i.result.stats.min * (i.qty ?? 1), 0);
+  L.push(""); L.push("RESUMO POR ITEM");
+  for (const i of tr.items) {
+    const min = i.result?.stats?.min ?? null;
+    L.push(`- ${i.label}: ${i.title} | Qtd: ${i.qty ?? 1} | Menor unit.: ${min != null ? fmtBRL(min) : "sem cotação"} | Estimado: ${min != null ? fmtBRL(min * (i.qty ?? 1)) : "—"}`);
+  }
+  L.push(""); L.push(`VALOR ESTIMADO DO OBJETO (soma dos menores × quantidades): ${fmtBRL(total)}`);
+  for (const i of tr.items) if (i.result) {
+    L.push(""); L.push(`================ ${i.label.toUpperCase()} — ${i.title} (Qtd: ${i.qty ?? 1}) ================`);
+    L.push(buildPlainReport(i.result, i.result.options));
+  }
+  return L.join("\n");
+}
+async function copyTrReport() {
+  try { await navigator.clipboard.writeText(buildTrReport()); toast("Relatório do TR copiado!"); } catch { toast("Falha ao copiar.", false); }
+}
+const TRKEY = "licita_tr_v1";
+function saveTrState() {
+  if (!tr) { localStorage.removeItem(TRKEY); return; }
+  const slim = tr.items.map(i => ({ ...i, result: i.result ? i.result : null }));
+  try { localStorage.setItem(TRKEY, JSON.stringify({ filename: tr.filename, items: slim, runningAll: false, stopAll: false })); } catch { }
+}
+
+/* ------------------ exemplos + marquee + boot ------------------ */
+const EXAMPLES = [
+  ["Notebook i5", "Notebook empresarial, processador Intel Core i5 de 12ª geração ou superior, memória RAM 8 GB DDR4, SSD NVMe 256 GB, tela de 14 polegadas Full HD antirreflexo, Windows 11 Pro, webcam HD, bateria mínima 6 horas, garantia mínima 12 meses. Produto novo, com nota fiscal."],
+  ["Ar-condicionado 12k BTU", "Ar-condicionado tipo Split Hi-Wall, 12.000 BTU/h, ciclo frio, gás R-32 ou R-410A, classificação A no Procel/Inmetro, 220V monofásico, controle remoto, garantia mínima 12 meses. Produto novo, nota fiscal, entrega no Brasil."],
+  ["Monitor 24 POLEGADAS", "Monitor LED 24 polegadas, painel IPS ou TN, resolução Full HD 1920x1080, taxa de atualização mínima 75Hz, entrada HDMI e VGA, ajuste de inclinação, garantia 12 meses. Produto novo, com nota fiscal."],
+];
+$("#exampleChips").innerHTML = EXAMPLES.map((e, i) => `<button data-ex="${i}" class="exChip rounded-full border border-white/10 bg-white/[.03] px-3 py-1 text-[11px] text-white/55 transition hover:border-[var(--volt)]/40 hover:text-[var(--volt)]">${e[0]}</button>`).join("");
+document.querySelectorAll(".exChip").forEach(b => b.onclick = () => { $("#editalInput").value = EXAMPLES[Number(b.dataset.ex)][1]; $("#charCount").textContent = `${EXAMPLES[Number(b.dataset.ex)][1].length}/8000`; });
+$("#sitesMarquee").innerHTML = [...SITES, ...SITES].map(s => `<span class="flex items-center gap-6 font-mono text-[11px] uppercase tracking-[.18em] text-white/35">${s}<span class="h-1 w-1 rounded-full bg-[var(--volt)]/50"></span></span>`).join("");
+
+/* boot */
+refreshStatus();
+showEmpty();
+renderHistory();
+try { const trSaved = JSON.parse(localStorage.getItem(TRKEY) || "null"); if (trSaved) { tr = trSaved; tr.runningAll = false; } } catch { }
+renderTr();
+renderImageZone();
+if (!store.key) setTimeout(showKeyModal, 600);
+</script>
+</body>
+</html>
