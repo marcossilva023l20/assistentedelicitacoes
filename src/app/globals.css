@@ -8,12 +8,9 @@
   --color-volt: #bff747;
   --color-volt-dim: #9bd12e;
   --color-mist: #9fb3ad;
-  --font-inter: Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-sora: Sora, ui-sans-serif, system-ui, sans-serif;
-  --font-jbmono: \"JetBrains Mono\", ui-monospace, \"SFMono-Regular\", monospace;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jbmono), ui-monospace, \"SFMono-Regular\", monospace;
+  --font-mono: var(--font-jbmono), ui-monospace, "SFMono-Regular", monospace;
 
   --animate-marquee: marquee 32s linear infinite;
   --animate-scan: scan 2.6s ease-in-out infinite;

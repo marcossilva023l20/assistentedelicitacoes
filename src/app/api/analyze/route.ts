@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { analyzeEditalItem, QuotaError } from "@/lib/gemini";
+import { analyzeEditalItem, MissingKeyError, QuotaError } from "@/lib/gemini";
 import { persistAnalysis } from "@/lib/persist";
 
 export const runtime = "nodejs";
@@ -37,6 +37,9 @@ export async function POST(req: Request) {
     const detail = await persistAnalysis(analysis, editalText);
     return NextResponse.json({ search: detail });
   } catch (err) {
+    if (err instanceof MissingKeyError) {
+      return NextResponse.json({ error: "Chave da IA não configurada.", code: "MISSING_KEY" }, { status: 503 });
+    }
     if (err instanceof QuotaError) {
       return NextResponse.json(
         {

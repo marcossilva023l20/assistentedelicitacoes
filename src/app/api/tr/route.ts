@@ -1,20 +1,13 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
-import { db, isDbConfigured } from "@/db";
+import { db } from "@/db";
 import { searches, trBatches } from "@/db/schema";
 import type { SearchSummary, TrBatchState } from "@/lib/shared";
-import { memoryStore } from "@/lib/memory-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!isDbConfigured || !db) {
-    const batch = memoryStore.getLatestTrBatch();
-    if (!batch) return NextResponse.json({ batch: null });
-    return NextResponse.json({ batch: memoryStore.toTrBatchState(batch) });
-  }
-
   const [batch] = await db.select().from(trBatches).orderBy(desc(trBatches.createdAt)).limit(1);
   if (!batch) return NextResponse.json({ batch: null });
 
