@@ -145,7 +145,9 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
     <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Esta página roda 100% no seu navegador e <strong class="text-white">já vem com a chave da IA embutida</strong> — não precisa colar nada para consultar. Deixe os campos abaixo vazios para usar a do site.</p>
     <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-white/75">
       <li>Quer usar <em>sua</em> chave (recomendado para uso intenso)? Gere em <span class="font-mono text-[var(--volt)]">aistudio.google.com</span> e cole abaixo: fica só no seu dispositivo e tem prioridade sobre a embutida.</li>
-      <li>Cole abaixo. A cota gratuita permite centenas de consultas por dia.</li>
+      <li>Deixe vazio e clique em Salvar para usar a chave do site. Se o site ainda não tiver uma
+          (o deploy injeta a chave a partir do secret <span class="font-mono text-[var(--volt)]">GEMINI_API_KEY</span> do Actions),
+          cole a sua aqui uma única vez — fica salva neste navegador e nunca mais é pedida.</li>
       <li><em class="text-white/60">Opcional:</em> como a página é estática, a varredura das lojas passa por um proxy CORS. Os proxies públicos são instáveis — para uso sério, implante o proxy do repositório (<span class="font-mono text-[var(--volt)]">pages-proxy/worker.js</span> num Cloudflare Worker grátis) e cole a URL aqui.</li>
     </ol>
     <input id="keyInput" type="password" placeholder="deixe vazio = usar a chave do site" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
@@ -270,7 +272,10 @@ $("#saveKeyBtn").onclick = () => {
 
 /* ------------------ chamadas à IA ------------------ */
 async function geminiCall(parts, maxTokens = 8192) {
-  if (!store.key) { showKeyModal(); throw new Error("Configure a chave da IA para pesquisar."); }
+  if (!store.key) {
+    showKeyModal();
+    throw new Error("Falta só a chave da IA — cole uma vez em ⚙ Chave IA (aistudio.google.com/apikey) e ela fica salva neste navegador.");
+  }
   let lastErr = null;
   for (const model of GEMINI_MODELS) {
     try {
