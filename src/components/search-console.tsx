@@ -59,6 +59,8 @@ interface Status {
   configured: boolean;
   model: string;
   mercadoLivreApi?: boolean;
+  /** onde o histórico é gravado: banco (Postgres) ou arquivo local do servidor */
+  storage?: "postgres" | "local";
 }
 
 /** Reduz a foto antes de enviar (menos bytes, mais velocidade). */
@@ -123,31 +125,30 @@ export default function SearchConsole() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    let retries = 0;
-    const maxRetries = 5;
-    const fetchStatus = async () => {
-      try {
-        const r = await fetch("/api/status", { cache: "no-store" });
-        if (!r.ok) throw new Error("status not ok");
-        const d = (await r.json()) as Status & { db?: boolean; mode?: string };
-        if (!cancelled) setStatus(d as Status);
-      } catch {
-        if (retries < maxRetries && !cancelled) {
-          retries++;
-          setTimeout(fetchStatus, 1000 * retries);
-        } else if (!cancelled) {
-          // fallback: modo local funciona mesmo sem IA
-          setStatus({ configured: false, model: "filtro local (sem chave)" });
-        }
-      }
-    };
-    fetchStatus();
-    refreshHistory();
+    let alive = true;
+    // Tudo dentro de .then(): nenhum setState síncrono no corpo do effect
+    // (isso causaria um segundo render em cascata logo no mount).
+    void Promise.all([
+      fetch("/api/status", { cache: "no-store" })
+        .then(async (r) => (r.ok ? ((await r.json()) as Status) : null))
+        .catch(() => ({ configured: false, model: "gemini" }) as Status),
+      fetch("/api/searches", { cache: "no-store" })
+        .then(async (r) => (r.ok ? ((await r.json()) as { searches: SearchSummary[] }) : null))
+        .catch(() => null),
+    ])
+      .then(([status, hist]) => {
+        if (!alive) return;
+        if (status) setStatus(status);
+        if (hist?.searches) setHistory(hist.searches);
+        setHistoryLoading(false);
+      })
+      .catch(() => {
+        if (alive) setHistoryLoading(false);
+      });
     return () => {
-      cancelled = true;
+      alive = false;
     };
-  }, [refreshHistory]);
+  }, []);
 
   const scrollToResults = useCallback(() => {
     requestAnimationFrame(() =>
@@ -397,7 +398,7 @@ export default function SearchConsole() {
             </span>
           </a>
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60">
+            <span className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 sm:flex">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   status == null
@@ -408,24 +409,11 @@ export default function SearchConsole() {
                 }`}
               />
               {status == null
-                ? "conectando… (aguarde 2s)"
+                ? "conectando…"
                 : status.configured
-                  ? `IA ativa · ${status.model} · modo ${ (status as any).mode || "memory" }`
-                  : `modo local · ${status.model} (sem chave)`}
+                  ? `IA ativa · ${status.model} · ${status.storage === "postgres" ? "histórico no banco" : "histórico local"}`
+                  : "configure a chave da IA"}
             </span>
-            <button
-              onClick={() => {
-                setStatus(null);
-                fetch("/api/status", { cache: "no-store" })
-                  .then((r) => r.json())
-                  .then((d) => setStatus(d))
-                  .catch(() => setStatus({ configured: false, model: "filtro local" }));
-              }}
-              className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/50 hover:text-white"
-              title="Recarregar status"
-            >
-              ↻
-            </button>
           </div>
         </div>
       </header>

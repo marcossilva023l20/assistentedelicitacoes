@@ -9,11 +9,15 @@ import { formatBRL } from "@/lib/shared";
 
 function useCountUp(target: number | null, duration = 1100) {
   const [value, setValue] = useState(0);
+  // Reinicia o contador quando o alvo some — padrão oficial de "ajustar estado na
+  // renderização" (evita setState síncrono dentro do effect, que causa render em cascata).
+  const [previousTarget, setPreviousTarget] = useState(target);
+  if (previousTarget !== target) {
+    setPreviousTarget(target);
+    if (target == null) setValue(0);
+  }
   useEffect(() => {
-    if (target == null) {
-      setValue(0);
-      return;
-    }
+    if (target == null) return;
     let raf = 0;
     const start = performance.now();
     const tick = (now: number) => {

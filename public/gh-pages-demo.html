@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="locked">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>LicitaPreço — Do edital ao menor preço</title>
 <meta name="description" content="Cole o item do edital e receba as melhores ofertas do varejo brasileiro que atendem o edital, ordenadas pelo menor preço, com links reais. Versão estática (GitHub Pages)." />
 <script src="https://cdn.tailwindcss.com"></script>
@@ -18,6 +18,11 @@ body{ background:var(--ink); color:#e8f0ed; font-family:Inter,system-ui,sans-ser
 ::selection{ background:var(--volt); color:var(--ink); }
 .bg-grid{ background-image:linear-gradient(to right,rgba(148,210,189,.045) 1px,transparent 1px),linear-gradient(to bottom,rgba(148,210,189,.045) 1px,transparent 1px); background-size:56px 56px; }
 .glass{ background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); border:1px solid rgba(255,255,255,.07); }
+/* o vidro do modal deixava o texto da página ATRAVÉS dele (inlegível, parecia campo sobreposto):
+   aqui o cartão ganha fundo opaco e passa a rolar sozinho quando a janela é baixa */
+.modal-card{ background:rgba(8,12,14,.985); box-shadow:0 24px 70px -20px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+  max-height:min(90vh,860px); overflow-y:auto; overscroll-behavior:contain; }
+@media (max-width:640px){ .modal-card{ max-height:88dvh; } }
 .text-outline{ color:transparent; -webkit-text-stroke:1.5px rgba(191,247,71,.28); }
 .shine{ background:linear-gradient(100deg,#f2fff9 20%,#bff747 45%,#57ffc7 60%,#f2fff9 80%); background-size:220% auto; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 7s linear infinite; }
 @keyframes shine{ to{ background-position:220% center; } }
@@ -29,6 +34,21 @@ body{ background:var(--ink); color:#e8f0ed; font-family:Inter,system-ui,sans-ser
 .corner::before{ top:-1px; left:-1px; border-width:1.5px 0 0 1.5px; } .corner::after{ bottom:-1px; right:-1px; border-width:0 1.5px 1.5px 0; }
 .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 input[type=range]{ accent-color:var(--volt); }
+/* enquanto não houver sessão válida, nada do app fica visível/atingível (visibility também
+   tira do ordem de tab, então não dá para navegar até os campos com Tab) */
+html.locked > body > *:not(#authGate){ visibility:hidden; }
+html.locked, html.locked > body{ overflow:hidden !important; }
+/* o portão é visível por padrão no HTML: se o script principal não rodar (navegador antigo,
+   WebView do WhatsApp/Instagram, modo privado), aparece a tela de acesso com aviso em vez de
+   uma tela preta. Ele só é escondido pelo estado acima, nunca por uma classe que dependa do JS. */
+html:not(.locked) > body > #authGate{ display:none; }
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+#authGate{ padding-bottom:max(2rem, env(safe-area-inset-bottom)); }
+@media (max-height:720px){ #authGate{ padding-top:1rem; } #authGate > div{ min-height:0; } #authGate .glass{ padding:1.25rem; } }
+/* iOS dá zoom em qualquer campo com fonte < 16px — isso empurra o formulário para fora da tela */
+@media (max-width:640px){ input, select, textarea{ font-size:16px !important; } }
+@keyframes shakeX{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.shake{animation:shakeX .38s ease}
 .fade-in{ animation:fadeIn .35s ease both; } @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
 .toast{ animation:fadeIn .25s ease both; }
 progress::-webkit-progress-bar{ background:rgba(255,255,255,.08); border-radius:99px; }
@@ -36,6 +56,57 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
 </style>
 </head>
 <body class="antialiased">
+
+<!-- ============ TELA DE ACESSO (e-mail + senha) ============ -->
+<div id="authGate" class="fixed inset-0 z-[95] overflow-y-auto bg-[#05080a] px-4 py-8">
+  <div class="bg-grid pointer-events-none absolute inset-0 opacity-70"></div>
+  <div class="relative mx-auto flex min-h-[80vh] w-full max-w-md flex-col justify-center fade-in">
+    <div class="glass corner rounded-3xl p-7">
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--volt)] text-lg text-[#05080a]">⚖</span>
+        <div>
+          <p class="font-display text-base font-bold tracking-tight text-white">LicitaPreço</p>
+          <p id="gateSubtitle" class="text-[11px] text-[var(--mist)]">entre com e-mail e senha para consultar</p>
+        </div>
+      </div>
+
+      <form id="gateForm" class="mt-6 space-y-3" novalidate>
+        <label class="block">
+          <span class="text-[11px] uppercase tracking-wider text-white/45">E-mail</span>
+          <input id="gateEmail" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="next" aria-describedby="gateMsg" placeholder="seu.nome@orgao.gov.br"
+            class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+        </label>
+        <label class="block">
+          <span class="text-[11px] uppercase tracking-wider text-white/45">Senha</span>
+          <input id="gatePass" type="password" autocomplete="current-password" enterkeyhint="next" placeholder="••••••••••"
+            class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+        </label>
+        <div id="gateConfirmWrap" class="hidden">
+          <label class="block">
+            <span class="text-[11px] uppercase tracking-wider text-white/45">Confirme a senha</span>
+            <input id="gatePass2" type="password" autocomplete="new-password" enterkeyhint="go" placeholder="••••••••••"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+          </label>
+          <p class="mt-2 text-[11px] leading-relaxed text-white/40">Mínimo de 10 caracteres. Neste modo local, a senha fica salva <em>só neste navegador</em>, como resumo SHA-256 com salt — nada vai para servidor.</p>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-white/60">
+          <input id="gateRemember" type="checkbox" checked class="h-3.5 w-3.5 accent-[var(--volt)]" />
+          manter conectado neste dispositivo
+        </label>
+        <p id="gateDead" class="hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-[11px] leading-relaxed text-rose-200"></p>
+        <p id="gateMsg" class="hidden rounded-xl border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-200"></p>
+        <button id="gateSubmit" type="submit"
+          class="w-full rounded-xl bg-[var(--volt)] py-3 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.35)] disabled:cursor-not-allowed disabled:opacity-40">Entrar</button>
+      </form>
+
+      <div class="mt-4 flex items-center justify-between gap-2 text-[11px] text-white/45">
+        <button id="gateToggle" type="button" class="underline decoration-white/20 underline-offset-2 transition hover:text-[var(--volt)]">criar novo acesso</button>
+        <span id="gateMode" class="font-mono text-white/30">verificação local</span>
+      </div>
+    </div>
+    <p id="gateNote" class="mt-4 text-center text-[11px] leading-relaxed text-white/35"></p>
+  </div>
+</div>
 
 <!-- ============ HEADER ============ -->
 <header class="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-[#05080a]/80 backdrop-blur-xl">
@@ -50,6 +121,10 @@ progress::-webkit-progress-value{ background:var(--volt); border-radius:99px; }
       <span id="statusDot" class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 sm:flex">
         <span id="statusPing" class="h-1.5 w-1.5 rounded-full blink bg-white/40"></span>
         <span id="statusText">conectando…</span>
+      </span>
+      <span id="btnUser" class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60" title="Sessão ativa">
+        <span id="userChip" class="max-w-[16ch] truncate font-mono"></span>
+        <button id="btnLogout" type="button" class="text-white/45 transition hover:text-rose-300" title="Sair desta sessão">sair</button>
       </span>
       <button id="btnKey" class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/70 transition hover:border-[var(--volt)]/50 hover:text-[var(--volt)]" title="Configurar chave da IA (Gemini)">⚙ Chave IA</button>
     </div>
@@ -139,17 +214,32 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
 </footer>
 
 <!-- ============ MODAL DA CHAVE ============ -->
-<div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-  <div class="glass w-full max-w-md rounded-3xl p-6">
-    <h3 class="font-display text-lg font-bold text-white">Chave da IA (Google Gemini — grátis)</h3>
-    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Esta página roda 100% no seu navegador — a chave fica salva <strong class="text-white">somente no seu dispositivo</strong> (localStorage), nunca em servidor.</p>
-    <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-white/75">
-      <li>Acesse <span class="font-mono text-[var(--volt)]">aistudio.google.com</span> e clique em <em>Get API key</em> (conta Google).</li>
-      <li>Cole abaixo. A cota gratuita permite centenas de consultas por dia.</li>
+<div id="keyModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+  <div class="glass modal-card w-full max-w-md rounded-3xl p-6">
+    <h3 class="font-display text-lg font-bold text-white">Acesso, chave da IA e varredura das lojas</h3>
+    <p class="mt-2 text-sm leading-relaxed text-[var(--mist)]">Você já entrou com e-mail e senha. Falta só dizer de onde vem a IA: este site <strong class="text-white">não traz chave embutida</strong> (o GitHub bloqueia chave de API no código público), então escolha uma das rotas. Tudo aqui fica salvo <em>no seu navegador</em> — nada é enviado para um servidor nosso.</p>
+    <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-white/75">
+      <li><strong class="text-white/90">Sua chave, uma vez:</strong> gere em <span class="font-mono text-[var(--volt)]">aistudio.google.com/apikey</span> e cole em <em>Chave da IA</em>. Nunca mais é pedida neste dispositivo (e vale para o seu e-mail cadastrado na tela de acesso).</li>
+      <li><strong class="text-white/90">Chave para todos os visitantes:</strong> crie o secret <span class="font-mono text-[var(--volt)]">GEMINI_API_KEY</span> em <em>Settings → Secrets and variables → Actions</em> e deixe o workflow <span class="font-mono text-[var(--volt)]">pages.yml</span> ativo na branch que o Pages publica — o deploy injeta a chave no arquivo publicado, sem ela nunca ir ao repositório.</li>
+      <li><strong class="text-white/90">Servidor (recomendado):</strong> publique <span class="font-mono text-[var(--volt)]">pages-proxy/worker.js</span> num Cloudflare Worker grátis e cole a URL em <em>Servidor</em>. A chave fica só no Worker (o HTML não leva nada), a IA é chamada por ele, o login é validado por ele e a varredura das lojas também. <em class="text-white/60">Sem esse campo, a varredura depende dos proxies CORS públicos, hoje instáveis.</em></li>
     </ol>
-    <input id="keyInput" type="password" placeholder="Cole sua chave Gemini aqui" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <span class="mt-4 block text-[11px] uppercase tracking-wider text-white/45">Chave da IA (opcional)</span>
+    <input id="keyInput" type="password" placeholder="AIza… — fica só neste navegador; vazio = usar o servidor" class="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <span class="mt-3 block text-[11px] uppercase tracking-wider text-white/45">Servidor do site — Worker (opcional)</span>
+    <input id="serverInput" type="text" placeholder="https://SEU-PROXY.workers.dev/  (valida o login, faz a IA e varre as lojas)" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-[12px] text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <span class="mt-3 block text-[11px] uppercase tracking-wider text-white/45">Proxy só de varredura (opcional)</span>
+    <input id="proxyInput" type="text" placeholder="https://meu-proxy.workers.dev/?url=" class="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-[var(--volt)]/50 focus:outline-none" />
+    <div id="storageWarn" class="mt-4 hidden rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-[11px] leading-relaxed text-rose-100">
+      <p><strong class="text-rose-200">Este navegador não deixa guardar nada</strong> (modo privado, ou aberto dentro do WhatsApp/Instagram). Salvar aqui vale só até fechar a página — é por isso que a chave é pedida de novo a cada entrada.</p>
+      <p class="mt-2">Saída que funciona sem armazenamento: um link que já leva a chave. Toque em <em>Gerar link</em>, copie e favorite (ou mande para você mesmo) — toda abertura dele traz a chave de volta. Nada disso vai ao GitHub: o que vem depois do <span class="font-mono">#</span> não é enviado a servidor nenhum.</p>
+      <div class="mt-2 flex gap-2">
+        <button id="genLinkBtn" type="button" class="flex-1 rounded-lg border border-rose-300/30 bg-rose-300/10 px-2 py-1.5 text-[11px] text-rose-100 transition hover:bg-rose-300/20">Gerar link</button>
+        <button id="copyLinkBtn" type="button" class="flex-1 rounded-lg border border-rose-300/30 bg-rose-300/10 px-2 py-1.5 text-[11px] text-rose-100 transition hover:bg-rose-300/20 disabled:opacity-40" disabled>Copiar</button>
+      </div>
+      <textarea id="linkOut" readonly class="mt-2 hidden w-full rounded-lg border border-rose-300/20 bg-black/30 px-2 py-1.5 font-mono text-[10px] text-rose-50" rows="2"></textarea>
+    </div>
     <div class="mt-4 flex gap-2">
-      <button id="saveKeyBtn" class="flex-1 rounded-xl bg-[var(--volt)] py-2.5 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.4)]">Salvar chave</button>
+      <button id="saveKeyBtn" class="flex-1 rounded-xl bg-[var(--volt)] py-2.5 font-display text-sm font-bold text-[#05080a] transition hover:shadow-[0_0_24px_rgba(191,247,71,.4)]">Salvar</button>
       <button id="closeKeyBtn" class="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/70 hover:text-white">Fechar</button>
     </div>
   </div>
@@ -163,6 +253,35 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
   </div>
 </div>
 
+<script>
+/* Decide o estado do portão ANTES da primeira pintura e avisa se o app não ligar.
+   Script clássico de propósito: roda mesmo em navegador que ignora type="module". */
+(function () {
+  var d = document.documentElement;
+  // acesso cru de propósito: LS/SS do módulo ainda não existem aqui
+  var read = function (k) {
+    try { return (window.sessionStorage.getItem(k) || window.localStorage.getItem(k)); } catch (e) { return null; }
+  };
+  var ok = false;
+  try {
+    var s = JSON.parse(read("licita_session") || "null");
+    ok = !!(s && s.email && s.token && (!s.exp || s.exp > Date.now()));
+  } catch (e) { ok = false; }
+  if (ok) d.classList.remove("locked");
+  var dead = function (msg) {
+    var n = document.getElementById("gateDead");
+    if (!n) return;
+    n.textContent = msg; n.classList.remove("hidden");
+  };
+  window.addEventListener("error", function (e) {
+    if (d.__licitaBooted) return;
+    dead("O script do site não rodou neste navegador" + ((e && e.message) ? ": " + e.message : "") +
+      ". Atualize o Chrome/Safari, saia do modo privado e recarregue.");
+  }, true);
+  setTimeout(function () { if (!d.__licitaBooted) dead("O site não respondeu neste navegador. Abra no Chrome ou Safari (dentro do WhatsApp/Instagram alguns recursos são bloqueados), saia do modo privado e recarregue."); }, 2500);
+})();
+</script>
+
 <script type="module">
 /* ================================================================
    LicitaPreço estático — engine 100% no navegador
@@ -170,6 +289,27 @@ Ex.: “Nobreak 3.000 VA, dupla conversão, senoidal pura, bivolt, 8 tomadas, au
    ================================================================ */
 
 /* ------------------ estado / utilidades ------------------ */
+document.documentElement.__licitaBooted = true;
+document.getElementById("gateDead")?.classList.add("hidden");
+
+/* Modo privado e o WebView interno do WhatsApp/Instagram fazem localStorage LANCER erro — sem
+   esta camada o script morria na primeira linha e o site ficava uma tela preta no celular.
+   Cai para um depósito em memória (funciona na sessão, não sobrevive ao fechar). */
+const mkMemStore = () => {
+  const m = new Map();
+  return { __memory: true, getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+};
+const LS = (() => {
+  try { const s = window.localStorage; s.setItem("__licita_probe", "1"); s.removeItem("__licita_probe"); return s; } catch { return mkMemStore(); }
+})();
+const SS = (() => {
+  try { const s = window.sessionStorage; s.setItem("__licita_probe", "1"); s.removeItem("__licita_probe"); return s; } catch { return mkMemStore(); }
+})();
+const STORAGE_BLOCKED = Boolean(LS.__memory && SS.__memory);
+
+/* iOS Safari em aba de fundo pode lançar em getItem() mesmo com o storage disponível */
+const safeGet = (k) => { try { return LS.getItem(k); } catch { return null; } };
+
 const $ = (s) => document.querySelector(s);
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const fmtBRL = (v) => (v == null || !Number.isFinite(v) ? "—" : BRL.format(v));
@@ -223,76 +363,391 @@ function parseBRL(raw) {
 }
 
 /* ------------------ configuração (chave Gemini) ------------------ */
+/**
+ * Chave da IA usada pelo site, SEM o visitante precisar colar nada.
+ * O valor NÃO mora aqui: o workflow do Pages injeta o secret GEMINI_API_KEY
+ * (Settings → Secrets and variables → Actions) no HTML publicado — ver
+ * .github/scripts/inject-key.mjs. Deixar a chave literal num repositório público é lido por
+ * qualquer visitante (e o Push Protection do GitHub recusa o commit, com razão).
+ * Para uso local / teste, preencha em ⚙ Chave IA: o localStorage do dispositivo tem prioridade.
+ * ⚠ Ela fica legível no código-fonte público da página — serve para a cota GRATUITA da conta
+ *   Google dona da chave. Se aparecer cobrança no cartão, use uma chave só sua (campo do modal)
+ *   ou a versão Next.js, que lê GEMINI_API_KEY de .env.local (fora do git).
+ *   Para trocar sem rebuild: cole outra chave em ⚙ Chave IA — o localStorage do dispositivo
+ *   passa a ter prioridade sobre esta constante, e deixá-lo vazio volta para a chave do site.
+ */
+const PRESET_GEMINI_KEY = "";
 const store = {
-  get key() { return localStorage.getItem("licita_gemini_key") || ""; },
-  set key(v) { localStorage.setItem("licita_gemini_key", v.trim()); },
+  get key() { return safeGet("licita_gemini_key") || PRESET_GEMINI_KEY; },
+  /** vazio = volta a usar a chave embutida no site */
+  set key(v) { const x = (v || "").trim(); try { x ? LS.setItem("licita_gemini_key", x) : LS.removeItem("licita_gemini_key"); } catch { } },
+  /** proxy CORS próprio; vazio = tenta os proxies públicos (instáveis) */
+  get proxy() { return safeGet("licita_proxy_url") || ""; },
+  set proxy(v) { try { LS.setItem("licita_proxy_url", v.trim()); } catch { } },
+  /**
+   * Servidor próprio (o Cloudflare Worker de pages-proxy/). Quando existe, o login é verificado
+   * lá, a chamada de IA passa por ele (a chave do Google nunca aparece no HTML) e a varredura
+   * das lojas também. Vazio = tudo no navegador, com a chave local.
+   */
+  get server() { return safeGet("licita_server_url") || ""; },
+  set server(v) { const x = (v || "").trim(); try { x ? LS.setItem("licita_server_url", x) : LS.removeItem("licita_server_url"); } catch { } },
 };
-const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-8b", "gemini-2.0-flash-001", "gemini-1.5-flash-002"];
-function refreshStatus() {
-  const dot = $("#statusDot"), ping = $("#statusPing"), txt = $("#statusText");
-  if (!dot || !ping || !txt) return;
-  const hasKey = Boolean(store.key);
-  const isValidFormat = hasKey && (store.key.startsWith("AIza") || store.key.length >= 30);
-  ping.className = "h-1.5 w-1.5 rounded-full " + (hasKey ? (isValidFormat ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "bg-amber-400") : "blink bg-amber-400");
-  dot.classList.remove("hidden"); dot.classList.add("flex");
-  if (!hasKey) txt.textContent = "configure a chave da IA";
-  else if (!isValidFormat) txt.textContent = "chave em formato inválido (deve começar com AIza)";
-  else txt.textContent = "IA ativa (chave local) · " + GEMINI_MODELS[0];
-}
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+/* atalho: Esc fecha o modal ⚙ (útil quando ele abre sozinho no boot) */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const m = $("#keyModal");
+  if (m && !m.classList.contains("hidden")) { m.classList.add("hidden"); m.classList.remove("flex"); }
+});
 
-// Suporte a ?key= ou ?gemini_key= na URL para facilitar teste
-try {
-  const params = new URLSearchParams(location.search);
-  const urlKey = params.get("key") || params.get("gemini_key") || params.get("gemini");
-  if (urlKey && urlKey.length > 20) {
-    store.key = urlKey;
-    // limpa URL
-    history.replaceState({}, "", location.pathname);
-  }
-} catch {}
-$("#btnKey").onclick = () => { $("#keyInput").value = store.key; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); };
+function refreshStatus() {
+  const aiOk = AUTH.serverMode || Boolean(store.key);
+  $("#statusPing").className = "h-1.5 w-1.5 rounded-full " + (aiOk ? "bg-[var(--volt)] shadow-[0_0_10px_2px_rgba(191,247,71,.5)]" : "blink bg-amber-400");
+  $("#statusDot").classList.remove("hidden"); $("#statusDot").classList.add("flex");
+  const origemChave = !store.key ? null : (store.key === PRESET_GEMINI_KEY ? "chave do site" : "sua chave local")
+    + (STORAGE_BLOCKED ? " · não salva neste navegador" : "");
+  $("#statusText").textContent = !origemChave
+    ? "configure a chave da IA"
+    : "IA " + (AUTH.serverMode ? "via servidor" : "ativa · " + origemChave) + " · " +
+      (AUTH.serverMode || store.proxy ? "varredura própria" : "proxies públicos (instáveis)");
+}
+let __linkPronto = "";
+$("#genLinkBtn").onclick = () => {
+  const chave = $("#keyInput").value.trim() || safeGet("licita_gemini_key") || "";
+  const srv = $("#serverInput").value.trim();
+  const partes = [];
+  if (chave.length >= 10) partes.push("chave=" + encodeURIComponent(chave));
+  if (/^https?:\/\//i.test(srv)) partes.push("servidor=" + encodeURIComponent(srv));
+  if (!partes.length) { toast("Digite a chave primeiro.", false); return; }
+  __linkPronto = location.origin + location.pathname + "#" + partes.join("&");
+  const out = $("#linkOut");
+  out.value = __linkPronto; out.classList.remove("hidden"); out.focus(); out.select();
+  $("#copyLinkBtn").disabled = false;
+  toast("Link pronto — copie e favorite. Toda abertura dele já vem com a chave.");
+};
+$("#copyLinkBtn").onclick = async () => {
+  if (!__linkPronto) return;
+  try { await navigator.clipboard.writeText(__linkPronto); toast("Link copiado."); }
+  catch { const o = $("#linkOut"); o.focus(); o.select(); toast("Seu navegador não deixa copiar sozinho: o texto já está selecionado, segure para copiar.", false); }
+};
+$("#btnKey").onclick = () => { $("#keyInput").value = safeGet("licita_gemini_key") || ""; $("#serverInput").value = store.server; $("#proxyInput").value = store.proxy;
+  $("#storageWarn").classList.toggle("hidden", !STORAGE_BLOCKED);
+  $("#keyModal").classList.remove("hidden");
+  setTimeout(() => $("#keyInput").focus(), 60); $("#keyModal").classList.add("flex"); };
 $("#closeKeyBtn").onclick = () => { $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex"); };
 $("#saveKeyBtn").onclick = () => {
   const v = $("#keyInput").value.trim();
-  if (v.length < 10) { toast("Cole uma chave válida.", false); return; }
-  store.key = v; refreshStatus(); $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex");
-  toast("Chave salva no seu navegador.");
+  if (v && v.length < 10) { toast("Cole uma chave válida (ou deixe vazio para usar a do site).", false); return; }
+  const px = $("#proxyInput").value.trim();
+  const sv = $("#serverInput").value.trim();
+  for (const [name, val] of [["proxy", px], ["servidor", sv]]) {
+    if (val && !/^https?:\/\//i.test(val)) { toast("A URL do " + name + " precisa começar com http(s)://", false); return; }
+  }
+  const prevMode = AUTH.mode;
+  if (sv && !v) toast("Servidor salvo: a IA passa a ser chamada por ele, sem chave aqui.");
+  store.key = v; store.proxy = px; store.server = sv; refreshStatus(); paintGate();
+  if (AUTH.mode !== prevMode) ensureAccess();
+  const guardado = v ? (safeGet("licita_gemini_key") === v && !STORAGE_BLOCKED) : true;
+  $("#storageWarn").classList.toggle("hidden", !STORAGE_BLOCKED);
+  if (STORAGE_BLOCKED && v) {
+    // fechar o modal aqui só fingiria sucesso: nada persistiu, a próxima abertura pediria de novo
+    toast("Não deu para guardar neste navegador — use “Gerar link” abaixo, ou abra o site no Chrome/Safari.", false);
+    return;
+  }
+  $("#keyModal").classList.add("hidden"); $("#keyModal").classList.remove("flex");
+  toast((v ? (guardado ? "Chave salva neste navegador — ela não vai ser pedida de novo." : "Chave válida só nesta aba (o navegador bloqueou o armazenamento).") : "Usando a chave embutida no site.") + (px ? " Proxy salvo." : ""));
 };
+
+/* ------------------ controle de acesso (e-mail + senha) ------------------ */
+/**
+ * Dois modos com o mesmo formulário:
+ *  · "servidor" — store.server aponta para o Worker (pages-proxy/worker.js). O login é verificado
+ *    lá; a chave do Google fica num secret do Worker e não existe no HTML; a sessão é um token
+ *    HMAC assinado, com validade. É o modo que protege a cota de verdade.
+ *  · "local" — sem servidor: os acessos ficam no localStorage deste navegador, a senha como
+ *    SHA-256 com salt e o acesso é verificado aqui. Barreira contra uso casual, NÃO é segurança
+ *    (quem usa o próprio DevTools contorna). Sem WebCrypto (contexto inseguro), usa um resumo
+ *    mais fraco e avisa na tela.
+ */
+/* O $ deste arquivo é querySelector (exige '#'). O portão de acesso usa gEl(id), que é o
+   getElementById direto: sem convenção de seletor para errar. E gBind avisa no console em vez de
+   derrubar o script inteiro se um id faltar — era isso que deixava a tela de login inerte. */
+const gEl = (id) => document.getElementById(id);
+const gBind = (id, prop, fn) => {
+  const el = gEl(id);
+  if (el) el[prop] = fn;
+  else console.warn("[acesso] elemento ausente no HTML: #" + id);
+};
+
+const AUTH = (() => {
+  const UKEY = "licita_users", SKEY = "licita_session", TKEY = "licita_throttle";
+  const KEEP_DAYS = 14, MAX_FAILS = 5, COOLDOWN_MS = 30_000;
+  const subtleOk = typeof crypto !== "undefined" && !!crypto.subtle?.digest;
+
+  async function digest(text) {
+    if (subtleOk) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    let h = 0x811c9dc5 >>> 0;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return "f" + h.toString(16);
+  }
+  const saltOf = () => Array.from(crypto.getRandomValues?.(new Uint8Array(16)) || new Uint8Array(16), (b) => b.toString(16).padStart(2, "0")).join("");
+  const hashPw = (pw, salt) => digest(salt + ":" + pw);
+  const readJson = (k, d) => { try { return JSON.parse(LS.getItem(k)) ?? d; } catch { return d; } };
+  const setJson = (k, v) => (v == null ? LS.removeItem(k) : LS.setItem(k, JSON.stringify(v)));
+  const now = () => Date.now();
+
+  const base = () => (store_url() || "").trim().replace(/\/+$/, "") + "/";
+  function store_url() { try { return LS.getItem("licita_server_url") || ""; } catch { return ""; } }
+  const isServer = () => /^https?:\/\//i.test(store_url().trim());
+
+  function users() { return readJson(UKEY, []); }
+  function cooldownLeft() {
+    const t = readJson(TKEY, null);
+    if (!t || now() > t.until) return 0;
+    return t.until - now();
+  }
+  function noteFail() {
+    const t = readJson(TKEY, { n: 0, until: 0 });
+    t.n = (t.n || 0) + 1;
+    if (t.n >= MAX_FAILS) { t.until = now() + COOLDOWN_MS; t.n = 0; }
+    setJson(TKEY, t);
+  }
+
+  function sess() { try { return JSON.parse(SS.getItem(SKEY) || LS.getItem(SKEY) || "null"); } catch { return null; } }
+  function setSess(v, keep) {
+    SS.removeItem(SKEY); LS.removeItem(SKEY);
+    if (!v) return;
+    (keep ? LS : SS).setItem(SKEY, JSON.stringify(v));
+  }
+
+  let current = null;
+
+  /** valida a sessão guardada (no servidor, revalida o token; local, confere o resumo) */
+  async function restore() {
+    const s = sess();
+    if (!s?.email) return null;
+    if (Number(s.exp) && Number(s.exp) < now()) { setSess(null); return null; }
+    if (isServer()) {
+      try {
+        const r = await fetch(base() + "verify", { headers: { Authorization: "Bearer " + (s.token || "") } });
+        if (!r.ok) { setSess(null); return null; }
+        current = s; return s;
+      } catch {
+        setSess(null); return null; // sem o servidor não há como confirmar
+      }
+    }
+    const u = users().find((x) => x.email === s.email);
+    if (!u) { setSess(null); return null; }
+    if (s.token !== (await digest(u.hash + "|sess"))) { setSess(null); return null; }
+    current = s;
+    return s;
+  }
+
+  async function createAccess(email, pw) {
+    const e = String(email || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(e)) return { error: "Informe um e-mail válido." };
+    if (String(pw || "").length < 10) return { error: "A senha precisa de pelo menos 10 caracteres." };
+    const list = users();
+    if (list.some((u) => u.email === e)) return { error: "Já existe acesso com este e-mail neste navegador — entre em vez de criar." };
+    const salt = saltOf();
+    const hash = await hashPw(pw, salt);
+    list.push({ email: e, salt, hash, createdAt: new Date().toISOString() });
+    setJson(UKEY, list);
+    return { ok: true, email: e };
+  }
+
+  async function login(email, pw, keep) {
+    const e = String(email || "").trim().toLowerCase();
+    const left = cooldownLeft();
+    if (left > 0) return { error: `Muitas tentativas. Aguarde ${Math.ceil(left / 1000)} s.` };
+    if (!e || !pw) return { error: "Preencha e-mail e senha." };
+
+    if (isServer()) {
+      try {
+        const r = await fetch(base() + "login", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: e, password: pw }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) return { error: d.error || "E-mail ou senha inválidos." };
+        setSess({ email: d.email || e, token: d.token, exp: Number(d.exp) || now() + KEEP_DAYS * 864e5 }, keep);
+        current = sess();
+        return { ok: true, email: current.email };
+      } catch {
+        return { error: "Servidor de autenticação inacessível. Confira a URL em ⚙ ou use em modo local." };
+      }
+    }
+
+    const u = users().find((x) => x.email === e);
+    if (!u || (await hashPw(pw, u.salt)) !== u.hash) { noteFail(); return { error: "E-mail ou senha inválidos." }; }
+    setJson(TKEY, null);
+    const token = await digest(u.hash + "|sess");
+    setSess({ email: e, token, exp: now() + (keep ? KEEP_DAYS : 1) * 864e5 }, keep);
+    current = sess();
+    return { ok: true, email: e };
+  }
+
+  function signOut() { current = null; setSess(null); }
+
+  return {
+    get mode() { return isServer() ? "servidor" : "local"; },
+    get serverBase() { return base(); },
+    get serverMode() { return isServer(); },
+    get email() { return current?.email || ""; },
+    get token() { return current?.token || ""; },
+    get weakHash() { return !subtleOk; },
+    get storageBlocked() { return STORAGE_BLOCKED; },
+    users, restore, login, createAccess, signOut,
+    get enrolled() { return users().length; },
+  };
+})();
+
+/* ------------------ tela de acesso: pintura e eventos ------------------ */
+let gateMode = "login";
+function gateError(msg) {
+  const el = gEl("gateMsg");
+  if (!msg) { el.classList.add("hidden"); return; }
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  const card = document.querySelector("#authGate .glass");
+  card?.classList.remove("shake");
+  void card?.offsetWidth;
+  card?.classList.add("shake");
+}
+function paintGate() {
+  if (!gEl("gateSubmit")) return;
+  const firstRun = AUTH.mode === "local" && AUTH.enrolled === 0;
+  gateMode = firstRun ? "create" : gateMode;
+  const creating = gateMode === "create";
+  gEl("gateSubtitle").textContent = creating
+    ? "primeiro uso: defina o e-mail e a senha deste acesso"
+    : "entre com e-mail e senha para consultar";
+  gEl("gateConfirmWrap").classList.toggle("hidden", !creating);
+  gEl("gateSubmit").textContent = creating ? "Criar acesso e entrar" : "Entrar";
+  gEl("gatePass").autocomplete = creating ? "new-password" : "current-password";
+  gEl("gateToggle").classList.remove("hidden");
+  gEl("gateToggle").setAttribute("data-mode", gateMode);
+  // o rótulo descreve a AÇÃO do botão (não o modo atual): foi "criar novo acesso" parado em
+  // modo criar que pareceu botão quebrado
+  gEl("gateToggle").textContent = creating ? "já tenho um acesso, quero entrar" : "criar um novo acesso";
+  gEl("gateMode").textContent = AUTH.mode === "servidor" ? "verificado no servidor" : "verificação local";
+  gEl("gateNote").innerHTML = (AUTH.storageBlocked
+    ? "<span class=\"text-rose-300\">Este navegador bloqueou o armazenamento (modo privado ou app interno): o acesso vale só até fechar a página. Abra no Chrome/Safari normal para salvar.</span> "
+    : "") + (AUTH.mode === "servidor"
+    ? `Login validado pelo seu servidor <span class="font-mono text-white/45">${esc(AUTH.serverBase.replace(/^https:\/\//, ""))}</span> — a chave da IA fica fora do navegador.`
+    : (AUTH.weakHash
+        ? "Modo local: sem HTTPS/WebCrypto neste contexto, o resumo da senha é mais fraco. Para validação de verdade, configure o servidor em ⚙."
+        : "Modo local: os acessos existem só neste navegador (senha guardada como SHA-256 + salt). Contra uso casual — para proteger a cota da IA, use o servidor (pages-proxy/)."));
+  gEl("gateSubmit").disabled = false;
+}
+async function ensureAccess() {
+  const s = await AUTH.restore();
+  const locked = !s;
+  document.documentElement.classList.toggle("locked", locked);
+  gEl("authGate").classList.toggle("hidden", !locked);
+  gEl("authGate").classList.toggle("flex", locked);
+  gEl("btnUser").classList.toggle("hidden", locked);
+  gEl("btnUser").classList.toggle("flex", !locked);
+  if (!locked) {
+    gEl("userChip").textContent = s.email;
+    document.querySelectorAll(".fade-in").forEach((el) => el.classList.remove("hidden"));
+  } else {
+    gEl("gatePass").value = ""; gEl("gatePass2").value = "";
+    paintGate();
+    setTimeout(() => gEl("gateEmail").focus(), 80);
+  }
+  return !locked;
+}
+gBind("gateForm", "onsubmit", async (e) => {
+  e.preventDefault();
+  const email = gEl("gateEmail").value, pass = gEl("gatePass").value, keep = gEl("gateRemember").checked;
+  gateError(null);
+  const btn = gEl("gateSubmit");
+  btn.disabled = true; btn.textContent = "Verificando…";
+  try {
+    if (gateMode === "create") {
+      if (pass !== gEl("gatePass2").value) { gateError("As senhas não conferem."); return; }
+      const c = await AUTH.createAccess(email, pass);
+      if (c.error) { gateError(c.error); return; }
+    }
+    const r = await AUTH.login(email, pass, keep);
+    if (r.error) { gateError(r.error); return; }
+    toast("Acesso liberado." + (gateMode === "create" ? " Salvo neste navegador." : ""));
+    await ensureAccess();
+    if (!store.key && !AUTH.serverMode) setTimeout(showKeyModal, 400);
+  } finally {
+    btn.disabled = false;
+    paintGate();
+  }
+});
+$("#authGate")?.addEventListener("focusin", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+    setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+  }
+});
+gBind("gateToggle", "onclick", () => {
+  const firstRun = AUTH.mode === "local" && AUTH.enrolled === 0;
+  if (firstRun) {
+    // sem cadastro neste navegador não há para onde voltar: explicar em vez de ficar mudo
+    gateError("Ainda não existe acesso cadastrado neste navegador. Crie o primeiro acima "
+      + "(e-mail + senha de 10 caracteres) e entre com ele depois.");
+    gEl("gateEmail")?.focus?.();
+    return;
+  }
+  gateMode = gateMode === "create" ? "login" : "create";
+  gateError(null);
+  paintGate();
+  gEl(gateMode === "create" ? "gatePass2" : "gateSubmit")?.focus?.();
+});
+gBind("btnLogout", "onclick", () => { AUTH.signOut(); location.reload(); });
 
 /* ------------------ chamadas à IA ------------------ */
 async function geminiCall(parts, maxTokens = 8192) {
-  if (!store.key) { showKeyModal(); throw new Error("Configure a chave da IA para pesquisar (clique em ⚙ Chave IA)."); }
-  // valida formato básico
-  if (!store.key.startsWith("AIza") && store.key.length < 30) {
-    throw new Error("Chave em formato inválido. Chaves Gemini válidas começam com 'AIza' e têm ~39 caracteres. Gere em aistudio.google.com");
+  if (AUTH.serverMode) {
+    if (!AUTH.token) { ensureAccess(); throw new Error("Sua sessão expirou — entre de novo para consultar."); }
+    let res, data = {};
+    try {
+      res = await fetch(AUTH.serverBase + "gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + AUTH.token },
+        body: JSON.stringify({ contents: [{ role: "user", parts }], config: { maxOutputTokens: maxTokens } }),
+      });
+      data = await res.json().catch(() => ({}));
+    } catch {
+      throw new Error("Servidor de IA inacessível (URL em ⚙?). Remova o campo para usar a chave salva no navegador.");
+    }
+    if (res.status === 401) { AUTH.signOut(); ensureAccess(); throw new Error("Sua sessão expirou — entre de novo para consultar."); }
+    if (!res.ok) throw new Error(data.error || "A IA falhou pelo servidor (HTTP " + res.status + (data.detail ? ": " + data.detail : "") + ").");
+    if (!data.text) throw new Error("O servidor devolveu a resposta da IA vazia.");
+    return { text: data.text, model: data.model || "servidor" };
+  }
+  if (!store.key) {
+    showKeyModal();
+    throw new Error("Falta só a chave da IA — cole uma vez em ⚙ Chave IA (aistudio.google.com/apikey) e ela fica salva neste navegador.");
   }
   let lastErr = null;
-  let lastStatus = null;
   for (const model of GEMINI_MODELS) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${store.key}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0.15, maxOutputTokens: maxTokens } })
       });
-      lastStatus = res.status;
-      if (res.status === 400) {
-        const errTxt = await res.text();
-        throw new Error(`Chave inválida (HTTP 400). Verifique se copiou corretamente de aistudio.google.com. Detalhe: ${errTxt.slice(0,200)}`);
+      if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error("quota/modelo"); continue; }
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
+        showKeyModal();
+        throw new Error("A chave da IA foi rejeitada pelo Google (revogada ou sem permissão). Se o campo acima está vazio, vale a chave embutida no site: gere outra em aistudio.google.com/apikey, cole aqui e Salve — ou atualize a constante PRESET_GEMINI_KEY e o secret GEMINI_API_KEY do deploy.");
       }
-      if (res.status === 429 || res.status === 404 || res.status === 503) { lastErr = new Error(`quota/modelo ${model} HTTP ${res.status}`); continue; }
-      if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`Falha na IA (HTTP ${res.status}). Se a rede estiver bloqueada, tente novamente.`);
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
       if (text) return { text, model };
-    } catch (e) {
-      lastErr = e;
-      const msg = String(e.message || "");
-      if (/Chave inválida|HTTP 400/.test(msg)) throw e;
-      if (!/quota|modelo/.test(msg) && !msg.includes("HTTP 404")) throw e;
-    }
+    } catch (e) { lastErr = e; if (!/quota|modelo/.test(String(e))) throw e; }
   }
-  if (lastStatus === 400) throw lastErr;
-  throw lastErr || new Error(`IA indisponível (último status: ${lastStatus}). Tente com filtro local ou verifique a chave.`);
+  throw lastErr || new Error("IA indisponível");
 }
 const geminiText = (prompt, mt) => geminiCall([{ text: prompt }], mt);
 const geminiImage = (prompt, b64, mime) => geminiCall([{ text: prompt }, { inlineData: { data: b64, mimeType: mime } }], 4096);
@@ -306,56 +761,40 @@ function extractJson(text) {
 const strArr = (v) => Array.isArray(v) ? v.map(x => typeof x === "string" ? x.trim() : "").filter(Boolean) : [];
 
 /* ------------------ proxy CORS + parsing das lojas ------------------ */
-const PROXIES = [
-  "https://cors.eu.org/",
-  "https://api.allorigins.win/raw?url=",
-  "https://api.codetabs.com/v1/proxy?quest=",
-  "https://corsproxy.io/?",
-  "https://thingproxy.freeboard.io/fetch/"
-];
+const PUBLIC_PROXIES = ["https://api.cors.lol/?url=", "https://api.allorigins.win/raw?url=", "https://cors.eu.org/"];
+/** transportes usados na varredura — permite dizer POR QUE não houve ofertas */
+const proxyHealth = { ok: 0, fail: 0, hosts: new Set(), custom: false };
+function proxyList() {
+  const out = [];
+  if (AUTH.serverMode) out.push({ px: AUTH.serverBase + "?url=", auth: true, label: "seu servidor" });
+  const custom = store.proxy.trim();
+  if (custom) { proxyHealth.custom = true; out.push({ px: custom, auth: custom.startsWith(AUTH.serverBase) }); }
+  for (const px of PUBLIC_PROXIES) out.push({ px });
+  return out;
+}
+function buildProxyUrl(px, url) {
+  if (px.includes("{url}")) return px.split("{url}").join(encodeURIComponent(url));
+  if (/[?=]$/.test(px)) return px + encodeURIComponent(url);
+  return px + encodeURIComponent(url).replace(/%2F/g, "/").replace(/%3A/g, ":");
+}
 async function proxied(url, timeoutMs = 16000) {
-  for (const px of PROXIES) {
+  for (const { px, auth, label } of proxyList()) {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs);
-      // alguns proxies esperam url crua, outros encodada
-      const finalUrl = px.includes("codetabs") || px.includes("corsproxy") || px.includes("thingproxy")
-        ? px + url
-        : px + encodeURIComponent(url);
-      const res = await fetch(finalUrl, { signal: ctl.signal });
+      const headers = auth && AUTH.token ? { Authorization: "Bearer " + AUTH.token } : undefined;
+      const res = await fetch(buildProxyUrl(px, url), { signal: ctl.signal, ...(headers ? { headers } : {}) });
       clearTimeout(t);
-      if (res.ok) { const txt = await res.text(); if (txt.length > 300) return txt; }
-    } catch { /* tenta o próximo */ }
+      if (res.ok) {
+        const txt = await res.text();
+        if (txt.length > 300) { proxyHealth.ok++; return txt; }
+      }
+      proxyHealth.fail++; proxyHealth.hosts.add(label || String(px).replace(/^https?:\/\//, "").split(/[/?]/)[0]);
+    } catch { proxyHealth.fail++; proxyHealth.hosts.add(label || String(px).replace(/^https?:\/\//, "").split(/[/?]/)[0]); }
   }
   return null;
 }
-
-// Fallback mock quando rede externa bloqueada (ex: GitHub Pages sem proxy funcionando)
-function mockCandidates(baseTerm) {
-  const sites = [
-    { site: "Amazon", price: 299.9 },
-    { site: "Mercado Livre", price: 279.9 },
-    { site: "Magazine Luiza", price: 319.0 },
-    { site: "KaBuM!", price: 289.5 },
-    { site: "Americanas", price: 305.0 },
-    { site: "Shopee", price: 259.9 },
-    { site: "Casas Bahia", price: 329.9 },
-    { site: "Carrefour", price: 315.0 },
-  ];
-  const seed = baseTerm.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
-  return sites.map((m,i)=>{
-    const variation = ((seed + i*37)%40)-20;
-    return {
-      site: m.site,
-      url: `https://www.bing.com/search?q=${encodeURIComponent(baseTerm + " " + m.site)}`,
-      name: `${baseTerm} - ${m.site} - modelo compativel com edital`,
-      price: Math.max(50, m.price + variation),
-      brand: "Genérica",
-      confirmed: false,
-      priceSource: "busca",
-      snippet: `Oferta mock para demonstração offline — termo: ${baseTerm}. Configure chave válida e proxy para ofertas reais.`
-    };
-  });
-}
+/** true quando NENHUM transporte respondeu — falha de infraestrutura, não "ausência de ofertas" */
+const proxyDown = () => proxyHealth.ok === 0 && proxyHealth.fail > 0;
 function extractNextData(html) {
   const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (!m) return null;
@@ -443,7 +882,7 @@ function stripTags(h) { return h.replace(/<script[\s\S]*?<\/script>/gi, " ").rep
 function extractProductFromPage(html) {
   const acc = [];
   for (const m of html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)) {
-    try { walkJsonLd(JSON.parse(m[1].replace(/[ -]/g, " ")), acc); } catch { /* inválido */ }
+    try { walkJsonLd(JSON.parse(m[1].replace(/[\u0000-\u001f]/g, " ")), acc); } catch { /* inválido */ }
     if (acc.length) break;
   }
   if (acc.length) return acc[0];
@@ -520,15 +959,6 @@ async function gatherCandidates(queries, cleanQueries) {
     }
   }));
   await Promise.allSettled(jobs);
-
-  // Fallback mock quando proxy falhar (GitHub Pages)
-  if (pool.length === 0) {
-    const baseTerm = (queries[0] || "produto").slice(0, 60);
-    console.warn("Nenhuma oferta real — usando mock local para demonstração");
-    const mocks = mockCandidates(baseTerm);
-    mocks.forEach((m,i)=>{ m.id = i+1; pool.push(m); });
-    return pool.slice(0, 10);
-  }
 
   // round-robin por loja
   const bySite = new Map();
@@ -627,11 +1057,21 @@ O usuário exige no mínimo ${filters.minScore}% de atendimento — estime a por
 
 /* ------------------ motor principal ------------------ */
 async function runAnalysis(editalText, filters) {
+  if (document.documentElement.classList.contains("locked")) {
+    ensureAccess();
+    throw new Error("Entre com e-mail e senha para consultar.");
+  }
   const plan = await planSearch(editalText, filters);
   setStep("Varrendo lojas e comparadores do Brasil…");
   const clean = [...new Set(plan.queries.map(storeQuery).filter(q => q.length > 3))].slice(0, 3);
   const candidates = await gatherCandidates(plan.queries, clean);
-  if (!candidates.length) throw new Error("Não consegui confirmar ofertas agora (proxy das lojas lento). Tente de novo em alguns segundos.");
+  if (!candidates.length) {
+    if (proxyDown()) {
+      const onde = proxyHealth.custom ? `seu proxy (${[...proxyHealth.hosts][0] || "?"}) e os públicos` : "os proxies públicos";
+      throw new Error(`Nenhum proxy respondeu (${onde}) — sem servidor, a página estática depende dele para ler as lojas. Configure o seu em ⚙ Chave IA (2 minutos: veja pages-proxy/LEIA-ME.md) e consulte de novo.`);
+    }
+    throw new Error("As lojas não mostraram ofertas para estes termos agora (podem estar limitando o robô). Tente de novo em alguns segundos ou simplifique a descrição do item.");
+  }
   setStep("IA avaliando a conformidade com o edital…");
   const verdicts = await evaluateAll(editalText, plan.requirements, candidates, filters);
   const byId = new Map(candidates.map(c => [c.id, c]));
@@ -905,15 +1345,20 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); runSearch(); }
 });
 $("#editalInput").oninput = (e) => { $("#charCount").textContent = `${e.target.value.length}/8000`; };
-function showKeyModal() { $("#keyInput").value = store.key; $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex"); }
+function showKeyModal() {
+  $("#keyInput").value = safeGet("licita_gemini_key") || "";
+  $("#storageWarn").classList.toggle("hidden", !STORAGE_BLOCKED);
+  $("#keyModal").classList.remove("hidden"); $("#keyModal").classList.add("flex");
+  setTimeout(() => $("#keyInput").focus(), 60);
+}
 
 /* ------------------ histórico (localStorage) ------------------ */
 const HKEY = "licita_historico_v1";
-function loadHistory() { try { return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch { return []; } }
+function loadHistory() { try { return JSON.parse(LS.getItem(HKEY) || "[]"); } catch { return []; } }
 function saveHistory(r) {
   const h = loadHistory();
   h.unshift(r);
-  localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 40)));
+  LS.setItem(HKEY, JSON.stringify(h.slice(0, 40)));
 }
 function renderHistory() {
   const h = loadHistory();
@@ -927,7 +1372,7 @@ function renderHistory() {
     <button id="btnDeleteAll" class="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 transition hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300">🗑 Limpar histórico</button>`;
   $("#btnDeleteAll").onclick = () => {
     if (!confirm("Apagar TODAS as cotações salvas neste navegador?")) return;
-    localStorage.removeItem(HKEY); renderHistory(); toast("Histórico esvaziado.");
+    LS.removeItem(HKEY); renderHistory(); toast("Histórico esvaziado.");
   };
   $("#historyPanel").innerHTML = `
   <ul class="glass divide-y divide-white/5 overflow-hidden rounded-3xl">
@@ -956,7 +1401,7 @@ function renderHistory() {
   document.querySelectorAll(".histDel").forEach(el => el.onclick = (e) => {
     e.stopPropagation();
     const h = loadHistory().filter(x => x.id !== el.dataset.id);
-    localStorage.setItem(HKEY, JSON.stringify(h));
+    LS.setItem(HKEY, JSON.stringify(h));
     renderHistory(); toast("Cotação excluída.");
   });
 }
@@ -1236,9 +1681,9 @@ async function copyTrReport() {
 }
 const TRKEY = "licita_tr_v1";
 function saveTrState() {
-  if (!tr) { localStorage.removeItem(TRKEY); return; }
+  if (!tr) { LS.removeItem(TRKEY); return; }
   const slim = tr.items.map(i => ({ ...i, result: i.result ? i.result : null }));
-  try { localStorage.setItem(TRKEY, JSON.stringify({ filename: tr.filename, items: slim, runningAll: false, stopAll: false })); } catch { }
+  try { LS.setItem(TRKEY, JSON.stringify({ filename: tr.filename, items: slim, runningAll: false, stopAll: false })); } catch { }
 }
 
 /* ------------------ exemplos + marquee + boot ------------------ */
@@ -1251,14 +1696,33 @@ $("#exampleChips").innerHTML = EXAMPLES.map((e, i) => `<button data-ex="${i}" cl
 document.querySelectorAll(".exChip").forEach(b => b.onclick = () => { $("#editalInput").value = EXAMPLES[Number(b.dataset.ex)][1]; $("#charCount").textContent = `${EXAMPLES[Number(b.dataset.ex)][1].length}/8000`; });
 $("#sitesMarquee").innerHTML = [...SITES, ...SITES].map(s => `<span class="flex items-center gap-6 font-mono text-[11px] uppercase tracking-[.18em] text-white/35">${s}<span class="h-1 w-1 rounded-full bg-[var(--volt)]/50"></span></span>`).join("");
 
+/* aceita a chave por #chave=… — permite favoritar o link e nunca mais digitar nada,
+   sem colocar a chave no código público do repositório (ela vai só para o seu navegador) */
+(function adoptConfigFromHash() {
+  const grab = (name) => {
+    const m = location.hash.match(new RegExp("[#&]" + name + "=([^&\s]+)"));
+    return m ? decodeURIComponent(m[1]).trim() : "";
+  };
+  const k = grab("chave");
+  const sv = grab("servidor");
+  const px = grab("proxy");
+  if (!k && !sv && !px) return;
+  const notes = [];
+  if (k.length >= 10) { store.key = k; notes.push("chave da IA"); }
+  if (/^https?:\/\//i.test(sv)) { store.server = sv; notes.push("servidor (login + IA + varredura)"); }
+  if (/^https?:\/\//i.test(px)) { store.proxy = px; notes.push("proxy de varredura"); }
+  history.replaceState(null, "", location.pathname + location.search);
+  if (notes.length) setTimeout(() => toast("Salvo no seu navegador: " + notes.join(", ") + ". Não precisa digitar de novo."), 400);
+})();
+
 /* boot */
 refreshStatus();
 showEmpty();
 renderHistory();
-try { const trSaved = JSON.parse(localStorage.getItem(TRKEY) || "null"); if (trSaved) { tr = trSaved; tr.runningAll = false; } } catch { }
+try { const trSaved = JSON.parse(LS.getItem(TRKEY) || "null"); if (trSaved) { tr = trSaved; tr.runningAll = false; } } catch { }
 renderTr();
 renderImageZone();
-if (!store.key) setTimeout(showKeyModal, 600);
+ensureAccess().then((ok) => { if (ok && !store.key && !AUTH.serverMode) setTimeout(showKeyModal, 500); });
 </script>
 </body>
 </html>

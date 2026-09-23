@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { db, isDbConfigured } from "@/db";
-import { trBatches } from "@/db/schema";
-import { analyzeEditalItem, QuotaError } from "@/lib/gemini";
-import { persistAnalysis } from "@/lib/persist";
-import { memoryStore } from "@/lib/memory-store";
+import { analyzeEditalItem } from "@/lib/gemini";
+import { aiErrorResponse } from "@/lib/api-error";
+import { getTrBatch, persistAnalysis } from "@/lib/persist";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -23,36 +20,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Parâmetros inválidos." }, { status: 400 });
   }
 
-  if (!isDbConfigured || !db) {
-    const batch = memoryStore.getTrBatch(batchId);
-    if (!batch) return NextResponse.json({ error: "TR não encontrado." }, { status: 404 });
-    const item = batch.items.find((it) => it.order === order);
-    if (!item) return NextResponse.json({ error: "Item não encontrado neste TR." }, { status: 404 });
-
-    try {
-      const analysis = await analyzeEditalItem(item.editalText);
-      const detail = await persistAnalysis(analysis, item.editalText, {
-        batchId: batch.id,
-        itemLabel: item.label,
-        titlePrefix: item.label,
-      });
-      return NextResponse.json({ search: detail, itemLabel: item.label, order });
-    } catch (err) {
-      if (err instanceof QuotaError) {
-        return NextResponse.json(
-          {
-            error: "Cota gratuita da IA atingida agora. Aguarde alguns minutos e continue a busca de onde parou.",
-            code: "QUOTA",
-          },
-          { status: 429 }
-        );
-      }
-      const message = err instanceof Error ? err.message : "Erro inesperado na análise.";
-      return NextResponse.json({ error: message, order }, { status: 500 });
-    }
-  }
-
-  const [batch] = await db.select().from(trBatches).where(eq(trBatches.id, batchId)).limit(1);
+  const batch = await getTrBatch(batchId);
   if (!batch) return NextResponse.json({ error: "TR não encontrado." }, { status: 404 });
   const item = batch.items.find((it) => it.order === order);
   if (!item) return NextResponse.json({ error: "Item não encontrado neste TR." }, { status: 404 });
@@ -66,15 +34,8 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ search: detail, itemLabel: item.label, order });
   } catch (err) {
-    if (err instanceof QuotaError) {
-      return NextResponse.json(
-        {
-          error: "Cota gratuita da IA atingida agora. Aguarde alguns minutos e continue a busca de onde parou.",
-          code: "QUOTA",
-        },
-        { status: 429 }
-      );
-    }
+    const mapped = aiErrorResponse(err);
+    if (mapped) return mapped;
     const message = err instanceof Error ? err.message : "Erro inesperado na análise.";
     return NextResponse.json({ error: message, order }, { status: 500 });
   }

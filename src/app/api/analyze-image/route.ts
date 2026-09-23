@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  analyzeProductImage,
-  analyzeEditalItem,
-  MissingKeyError,
-  QuotaError,
-} from "@/lib/gemini";
+import { analyzeProductImage, analyzeEditalItem } from "@/lib/gemini";
+import { aiErrorResponse } from "@/lib/api-error";
 import { persistAnalysis } from "@/lib/persist";
 
 export const runtime = "nodejs";
@@ -35,6 +31,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Imagem inválida ou vazia." }, { status: 400 });
     }
     if (mime === "image/heic" || mime === "image/heif") {
+      // alguns modelos rejeitam heic — o cliente já converte para jpeg; guarda de segurança
       return NextResponse.json({ error: "Converta a foto para JPG (ex.: exporte ou capture em JPG)." }, { status: 400 });
     }
   } catch {
@@ -47,19 +44,8 @@ export async function POST(req: Request) {
     const detail = await persistAnalysis(analysis, plan.description);
     return NextResponse.json({ search: detail, identified: { title: plan.title, description: plan.description } });
   } catch (err) {
-    if (err instanceof MissingKeyError) {
-      return NextResponse.json(
-        {
-          error:
-            "Busca por foto precisa da chave GEMINI_API_KEY (visão). Configure a chave para usar foto; a busca por texto funciona sem chave em modo local.",
-          code: "MISSING_KEY",
-        },
-        { status: 503 }
-      );
-    }
-    if (err instanceof QuotaError) {
-      return NextResponse.json({ error: err.message, code: "QUOTA" }, { status: 429 });
-    }
+    const mapped = aiErrorResponse(err);
+    if (mapped) return mapped;
     const message = err instanceof Error ? err.message : "Erro inesperado na análise da imagem.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

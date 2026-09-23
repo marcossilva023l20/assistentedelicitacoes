@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, isDbConfigured } from "@/db";
-import { trBatches } from "@/db/schema";
+import { createTrBatch } from "@/lib/persist";
 import { extractTextFromFile, segmentTr } from "@/lib/termo";
-import { geminiText } from "@/lib/gemini";
+import { GeminiUnreachableError, geminiText, InvalidKeyError, MissingKeyError } from "@/lib/gemini";
+import { aiErrorResponse } from "@/lib/api-error";
 import type { TrBatchState } from "@/lib/shared";
-import { memoryStore } from "@/lib/memory-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -47,8 +46,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // Mesmo sem GEMINI_API_KEY, segmentTr tem fallback local
-    const seg = await segmentTr(text, geminiText);
+    const hasKey = Boolean(
+      process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    );
+    if (!hasKey) throw new MissingKeyError();
+
+    // erros de chave/rede não podem virar "segmentação local" silenciosa
+    const seg = await segmentTr(text, async (prompt, maxTokens) => {
+      try {
+        return await geminiText(prompt, maxTokens);
+      } catch (err) {
+        if (err instanceof InvalidKeyError || err instanceof GeminiUnreachableError) throw err;
+        return null;
+      }
+    });
     if (seg.items.length === 0) {
       return NextResponse.json(
         {
@@ -59,26 +70,11 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!isDbConfigured || !db) {
-      const batch = memoryStore.createTrBatch(file.name, seg.items.map((it) => ({ ...it, search: null })));
-      const state: TrBatchState = memoryStore.toTrBatchState(batch);
-      return NextResponse.json({ batch: state, via: seg.via, mode: "memory" });
-    }
-
-    const [batch] = await db
-      .insert(trBatches)
-      .values({ filename: file.name, itemCount: seg.items.length, items: seg.items })
-      .returning();
-
-    const state: TrBatchState = {
-      id: batch.id,
-      filename: batch.filename,
-      itemCount: batch.itemCount,
-      createdAt: batch.createdAt.toISOString(),
-      items: batch.items.map((it) => ({ ...it, search: null })),
-    };
+    const state: TrBatchState = await createTrBatch(file.name, seg.items);
     return NextResponse.json({ batch: state, via: seg.via });
   } catch (err) {
+    const mapped = aiErrorResponse(err);
+    if (mapped) return mapped;
     const message = err instanceof Error ? err.message : "Falha ao processar o arquivo.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
